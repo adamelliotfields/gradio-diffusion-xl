@@ -1,13 +1,20 @@
 ---
-title: Diffusion Xl
-emoji: 🐢
-colorFrom: red
-colorTo: gray
+# https://huggingface.co/docs/hub/en/spaces-config-reference
+title: Diffusion XL
+short_description: Stable Diffusion XL image generation studio
+emoji: 🦣
+colorFrom: gray
+colorTo: red
 sdk: gradio
-sdk_version: 4.40.0
+sdk_version: 4.41.0
+python_version: 3.11.9
 app_file: app.py
+fullWidth: false
 pinned: false
+header: mini
 license: apache-2.0
 ---
 
-Check out the configuration reference at https://huggingface.co/docs/hub/spaces-config-reference
+# diffusion-xl
+
+Gradio app for Stable Diffusion XL.
