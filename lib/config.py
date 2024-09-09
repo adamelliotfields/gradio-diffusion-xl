@@ -26,9 +26,10 @@ Config = SimpleNamespace(
     },
     MODEL="fluently/Fluently-XL-Final",
     MODELS=[
+        # TODO: CyberRealisticXL once single file support is added
         "cagliostrolab/animagine-xl-3.1",
         "fluently/Fluently-XL-Final",
-        "RunDiffusion/Juggernaut-XL-v9",
+        "SG161222/RealVisXL_V5.0",
         "stabilityai/stable-diffusion-xl-base-1.0",
     ],
     VAE_MODEL="madebyollin/sdxl-vae-fp16-fix",
