@@ -6,6 +6,7 @@
   const updateMenu = () => {
     const isOpen = menuButton.classList.contains("open");
     content.style.display = isOpen ? "none" : "flex";
+    content.style.marginTop = isOpen ? "0" : "40px";
   };
 
   const observer = new MutationObserver(updateMenu);
