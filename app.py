@@ -310,7 +310,7 @@ with gr.Blocks(
         triggers=[generate_btn.click, prompt.submit],
         fn=generate_fn,
         api_name="generate",
-        concurrency_limit=5,
+        concurrency_limit=4,
         outputs=[output_images],
         inputs=[
             prompt,

@@ -74,14 +74,19 @@ def apply_style(prompt, style_id, negative=False):
     return prompt
 
 
-# TODO: fine-tune these
 def gpu_duration(**kwargs):
+    base = 20
     duration = 20
     scale = kwargs.get("scale", 1)
     num_images = kwargs.get("num_images", 1)
-    if scale == 4:
+    use_refiner = kwargs.get("use_refiner", False)
+    if use_refiner:
+        base += 10
+    if scale == 2:
+        duration += 5
+    elif scale == 4:
         duration += 10
-    return duration * num_images
+    return base + (duration * num_images)
 
 
 @spaces.GPU(duration=gpu_duration)
