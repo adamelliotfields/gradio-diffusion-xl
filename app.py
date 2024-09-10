@@ -283,7 +283,7 @@ with gr.Blocks(
     seed.change(None, inputs=[seed], outputs=[], js=seed_js)
 
     file_format.change(
-        lambda f: (gr.Gallery(format=f), gr.Image(format=f), gr.Image(format=f)),
+        lambda f: gr.Gallery(format=f),
         inputs=[file_format],
         outputs=[output_images],
         show_api=False,
