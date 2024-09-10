@@ -154,7 +154,7 @@ def generate(
 
     start = time.perf_counter()
     loader = Loader()
-    pipe, refiner, upscaler = loader.load(
+    loader.load(
         KIND,
         model,
         scheduler,
@@ -164,6 +164,15 @@ def generate(
         use_refiner,
         TQDM,
     )
+
+    pipe = loader.pipe
+    refiner = loader.refiner
+
+    upscaler = None
+    if scale == 2:
+        upscaler = loader.upscaler_2x
+    if scale == 4:
+        upscaler = loader.upscaler_4x
 
     # prompt embeds for base and refiner
     compel_1 = Compel(
@@ -204,7 +213,7 @@ def generate(
         # refiner expects latents; upscaler expects numpy array
         pipe_output_type = "pil"
         refiner_output_type = "pil"
-        if refiner:
+        if use_refiner:
             pipe_output_type = "latent"
             if scale > 1:
                 refiner_output_type = "np"
@@ -215,7 +224,7 @@ def generate(
         pipe_kwargs = {
             "width": width,
             "height": height,
-            "denoising_end": 0.8 if refiner else None,
+            "denoising_end": 0.8 if use_refiner else None,
             "generator": generator,
             "output_type": pipe_output_type,
             "guidance_scale": guidance_scale,
@@ -255,7 +264,6 @@ def generate(
         except Exception as e:
             raise Error(f"RuntimeError: {e}")
         finally:
-            # reset step and increment image
             CURRENT_STEP = 0
             CURRENT_IMAGE += 1
             current_seed += 1
