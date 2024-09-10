@@ -6,8 +6,6 @@ from diffusers import (
     DPMSolverMultistepScheduler,
     EulerAncestralDiscreteScheduler,
     EulerDiscreteScheduler,
-    KDPM2AncestralDiscreteScheduler,
-    KDPM2DiscreteScheduler,
     StableDiffusionXLImg2ImgPipeline,
     StableDiffusionXLPipeline,
 )
@@ -40,8 +38,6 @@ Config = SimpleNamespace(
         "DDIM": DDIMScheduler,
         "DEIS 2M": DEISMultistepScheduler,
         "DPM++ 2M": DPMSolverMultistepScheduler,
-        "DPM2": KDPM2DiscreteScheduler,
-        "DPM2 a": KDPM2AncestralDiscreteScheduler,
         "Euler": EulerDiscreteScheduler,
         "Euler a": EulerAncestralDiscreteScheduler,
     },

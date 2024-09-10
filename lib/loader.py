@@ -174,7 +174,8 @@ class Loader:
                 print(f"{'Enabling' if karras else 'Disabling'} Karras sigmas...")
             if not same_scheduler or not same_karras:
                 self.pipe.scheduler = Config.SCHEDULERS[scheduler](**scheduler_kwargs)
-                self.refiner.scheduler = self.pipe.scheduler
+                if self.refiner is not None:
+                    self.refiner.scheduler = self.pipe.scheduler
 
         # https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/blob/main/model_index.json
         refiner_kwargs = {
