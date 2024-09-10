@@ -16,6 +16,7 @@ license: apache-2.0
 models:
 - ai-forever/Real-ESRGAN
 - cagliostrolab/animagine-xl-3.1
+- cyberdelia/CyberRealsticXL
 - fluently/Fluently-XL-Final
 - madebyollin/sdxl-vae-fp16-fix
 - SG161222/RealVisXL_V5.0
@@ -27,22 +28,25 @@ preload_from_hub:
   RealESRGAN_x2.pth,RealESRGAN_x4.pth
 - >-
   cagliostrolab/animagine-xl-3.1
-  text_encoder/model.safetensors,text_encoder_2/model.safetensors,unet/diffusion_pytorch_model.safetensors,model_index.json
+  animagine-xl-3.1.safetensors
+- >-
+  cyberdelia/CyberRealsticXL
+  CyberRealisticXLPlay_V1.0.safetensors
 - >-
   fluently/Fluently-XL-Final
-  text_encoder/model.safetensors,text_encoder_2/model.safetensors,unet/diffusion_pytorch_model.safetensors,model_index.json
+  FluentlyXL-Final.safetensors
 - >-
   madebyollin/sdxl-vae-fp16-fix
-  diffusion_pytorch_model.safetensors,config.json
+  config.json,diffusion_pytorch_model.safetensors
 - >-
   SG161222/RealVisXL_V5.0
-  text_encoder/model.fp16.safetensors,text_encoder_2/model.fp16.safetensors,unet/diffusion_pytorch_model.fp16.safetensors,model_index.json
+  RealVisXL_V5.0_fp16.safetensors
 - >-
   stabilityai/stable-diffusion-xl-base-1.0
-  text_encoder/model.fp16.safetensors,text_encoder_2/model.fp16.safetensors,unet/diffusion_pytorch_model.fp16.safetensors,model_index.json
+  scheduler/scheduler_config.json,text_encoder/config.json,text_encoder/model.fp16.safetensors,text_encoder_2/config.json,text_encoder_2/model.fp16.safetensors,tokenizer/merges.txt,tokenizer/special_tokens_map.json,tokenizer/tokenizer_config.json,tokenizer/vocab.json,tokenizer_2/merges.txt,tokenizer_2/special_tokens_map.json,tokenizer_2/tokenizer_config.json,tokenizer_2/vocab.json,unet/config.json,unet/diffusion_pytorch_model.fp16.safetensors,vae/config.json,vae/diffusion_pytorch_model.fp16.safetensors,model_index.json
 - >-
   stabilityai/stable-diffusion-xl-refiner-1.0
-  text_encoder_2/model.fp16.safetensors,unet/diffusion_pytorch_model.fp16.safetensors,model_index.json
+  scheduler/scheduler_config.json,text_encoder_2/config.json,text_encoder_2/model.fp16.safetensors,tokenizer_2/merges.txt,tokenizer_2/special_tokens_map.json,tokenizer_2/tokenizer_config.json,tokenizer_2/vocab.json,unet/config.json,unet/diffusion_pytorch_model.fp16.safetensors,vae/config.json,vae/diffusion_pytorch_model.fp16.safetensors,model_index.json
 ---
 
 # diffusion-xl

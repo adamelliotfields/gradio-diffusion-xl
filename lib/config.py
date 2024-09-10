@@ -25,12 +25,19 @@ Config = SimpleNamespace(
     },
     MODEL="fluently/Fluently-XL-Final",
     MODELS=[
-        # TODO: CyberRealisticXL once single file support is added
         "cagliostrolab/animagine-xl-3.1",
+        "cyberdelia/CyberRealsticXL",
         "fluently/Fluently-XL-Final",
         "SG161222/RealVisXL_V5.0",
         "stabilityai/stable-diffusion-xl-base-1.0",
     ],
+    MODEL_CHECKPOINTS={
+        # keep keys lowercase
+        "cagliostrolab/animagine-xl-3.1": "animagine-xl-3.1.safetensors",
+        "cyberdelia/cyberrealsticxl": "CyberRealisticXLPlay_V1.0.safetensors",  # typo in "realistic"
+        "fluently/fluently-xl-final": "FluentlyXL-Final.safetensors",
+        "sg161222/realvisxl_v5.0": "RealVisXL_V5.0_fp16.safetensors",
+    },
     VAE_MODEL="madebyollin/sdxl-vae-fp16-fix",
     REFINER_MODEL="stabilityai/stable-diffusion-xl-refiner-1.0",
     SCHEDULER="Euler",

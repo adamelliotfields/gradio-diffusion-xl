@@ -61,7 +61,13 @@ class Loader:
             try:
                 print(f"Loading {model}...")
                 self.model = model
-                self.pipe = pipeline.from_pretrained(model, **kwargs).to("cuda")
+                if model.lower() in Config.MODEL_CHECKPOINTS.keys():
+                    self.pipe = pipeline.from_single_file(
+                        f"https://huggingface.co/{model}/{Config.MODEL_CHECKPOINTS[model.lower()]}",
+                        **kwargs,
+                    ).to("cuda")
+                else:
+                    self.pipe = pipeline.from_pretrained(model, **kwargs).to("cuda")
                 if self.refiner is not None:
                     self.refiner.vae = self.pipe.vae
                     self.refiner.scheduler = self.pipe.scheduler
