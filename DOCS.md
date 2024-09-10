@@ -20,7 +20,12 @@ Rescale up to 4x using [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) fro
 
 ## Models
 
-TBD
+Each model checkpoint has a different aesthetic:
+
+* [cagliostrolab/animagine-xl-3.1](https://huggingface.co/cagliostrolab/animagine-xl-3.1): anime
+* [fluently/Fluently-XL-Final](https://huggingface.co/fluently/Fluently-XL-Final): general purpose
+* [SG161222/RealVisXL_V5.0](https://huggingface.co/SG161222/RealVisXL_V5.0): photorealistic
+* [stabilityai/stable-diffusion-xl-base-1.0](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0): base
 
 ## Advanced
 
@@ -34,4 +39,4 @@ TBD
 
 ### Refiner
 
-TBD
+Use the [ensemble of expert denoisers](https://research.nvidia.com/labs/dir/eDiff-I/) technique, where the first 80% of timesteps are denoised by the base model and the remaining 80% by the [refiner](https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0). Enabled by default. Not available with image-to-image pipelines.

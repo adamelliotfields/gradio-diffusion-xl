@@ -47,7 +47,16 @@ preload_from_hub:
 
 # diffusion-xl
 
-Gradio app for Stable Diffusion XL.
+Gradio app for Stable Diffusion XL featuring:
+
+* txt2img pipeline with refiner (img2img with IP-Adapter and ControlNet coming soon)
+* Curated models (LoRAs and TIs coming soon)
+* 100+ styles from sdxl_prompt_styler
+* 150+ prompts from StableStudio
+* Compel prompt weighting
+* Multiple samplers with Karras scheduling
+* DeepCache for speed
+* Real-ESRGAN upscaling
 
 ## Usage
 
