@@ -156,8 +156,7 @@ class Loader:
             scheduler_kwargs["clip_sample"] = False
             scheduler_kwargs["set_alpha_to_one"] = False
 
-        # no fp16 variant (already half-precision)
-        if model_lower not in ["cagliostrolab/animagine-xl-3.1", "fluently/fluently-xl-final"]:
+        if model_lower not in Config.MODEL_CHECKPOINTS.keys():
             variant = "fp16"
         else:
             variant = None
