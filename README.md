@@ -48,3 +48,37 @@ preload_from_hub:
 # diffusion-xl
 
 Gradio app for Stable Diffusion XL.
+
+## Usage
+
+See [DOCS.md](https://huggingface.co/spaces/adamelliotfields/diffusion-xl/blob/main/DOCS.md).
+
+## Installation
+
+```sh
+# clone
+git clone https://huggingface.co/spaces/adamelliotfields/diffusion-xl.git
+cd diffusion-xl
+git remote set-url origin https://adamelliotfields:$HF_TOKEN@huggingface.co/spaces/adamelliotfields/diffusion-xl
+
+# install
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# gradio
+python app.py --port 7860
+```
+
+## Development
+
+See [pull requests and discussions](https://huggingface.co/docs/hub/en/repositories-pull-requests-discussions).
+
+```sh
+git fetch origin refs/pr/42:pr/42
+git checkout pr/42
+# ...
+git add .
+git commit -m "Commit message"
+git push origin pr/42:refs/pr/42
+```

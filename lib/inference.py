@@ -91,7 +91,7 @@ def generate(
     style=None,
     seed=None,
     model="stabilityai/stable-diffusion-xl-base-1.0",
-    scheduler="DEIS 2M",
+    scheduler="DDIM",
     width=1024,
     height=1024,
     guidance_scale=7.5,
@@ -100,7 +100,7 @@ def generate(
     scale=1,
     num_images=1,
     use_karras=False,
-    use_refiner=True,
+    use_refiner=False,
     Info: Callable[[str], None] = None,
     Error=Exception,
     progress=None,
@@ -112,30 +112,39 @@ def generate(
     if seed is None or seed < 0:
         seed = int(datetime.now().timestamp() * 1_000_000) % (2**64)
 
-    EMBEDDINGS_TYPE = ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED
-
     KIND = "txt2img"
-
-    CURRENT_IMAGE = 1
     CURRENT_STEP = 0
+    CURRENT_IMAGE = 1
+    EMBEDDINGS_TYPE = ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED
 
     if progress is not None:
         TQDM = False
-        progress((0, inference_steps), desc=f"Generating image {CURRENT_IMAGE}/{num_images}")
+        progress((0, inference_steps), desc=f"Generating image 1/{num_images}")
     else:
         TQDM = True
 
     def callback_on_step_end(pipeline, step, timestep, latents):
         nonlocal CURRENT_IMAGE, CURRENT_STEP
+
         if progress is None:
             return latents
+
         strength = 1
         total_steps = min(int(inference_steps * strength), inference_steps)
-        CURRENT_STEP += step + 1
+
+        # if steps are different we're in the refiner
+        refining = False
+        if CURRENT_STEP == step:
+            CURRENT_STEP = step + 1
+        else:
+            refining = True
+            CURRENT_STEP += 1
+
         progress(
             (CURRENT_STEP, total_steps),
-            desc=f"Generating image {CURRENT_IMAGE}/{num_images}",
+            desc=f"{'Refining' if refining else 'Generating'} image {CURRENT_IMAGE}/{num_images}",
         )
+
         return latents
 
     start = time.perf_counter()
@@ -150,6 +159,7 @@ def generate(
         use_refiner,
         TQDM,
     )
+
     # prompt embeds for base and refiner
     compel_1 = Compel(
         text_encoder=[pipe.text_encoder, pipe.text_encoder_2],
@@ -232,7 +242,6 @@ def generate(
 
             if progress is not None:
                 refiner_kwargs["callback_on_step_end"] = callback_on_step_end
-
             if use_refiner:
                 image = refiner(**refiner_kwargs).images[0]
             if scale > 1:

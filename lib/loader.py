@@ -53,13 +53,13 @@ class Loader:
 
     def _unload(self, model, refiner, scale):
         to_unload = []
-        if self._should_unload_upscaler(scale):
-            to_unload.append("upscaler")
-        if self._should_unload_refiner(refiner):
-            to_unload.append("refiner")
         if self._should_unload_pipeline(model):
             to_unload.append("model")
             to_unload.append("pipe")
+        if self._should_unload_refiner(refiner):
+            to_unload.append("refiner")
+        if self._should_unload_upscaler(scale):
+            to_unload.append("upscaler")
         for component in to_unload:
             delattr(self, component)
         self._flush()
@@ -71,8 +71,13 @@ class Loader:
         if self.pipe is None:
             try:
                 print(f"Loading {model}...")
-                self.pipe = pipeline.from_pretrained(model, **kwargs).to("cuda")
                 self.model = model
+                self.pipe = pipeline.from_pretrained(model, **kwargs).to("cuda")
+                if self.refiner is not None:
+                    self.refiner.vae = self.pipe.vae
+                    self.refiner.scheduler = self.pipe.scheduler
+                    self.refiner.tokenizer_2 = self.pipe.tokenizer_2
+                    self.refiner.text_encoder_2 = self.pipe.text_encoder_2
             except Exception as e:
                 print(f"Error loading {model}: {e}")
                 self.model = None
@@ -125,7 +130,7 @@ class Loader:
             "steps_offset": 1,
         }
 
-        if scheduler not in ["DDIM", "Euler a", "PNDM"]:
+        if scheduler not in ["DDIM", "Euler a"]:
             scheduler_kwargs["use_karras_sigmas"] = karras
 
         # https://github.com/huggingface/diffusers/blob/8a3f0c1/scripts/convert_original_stable_diffusion_to_diffusers.py#L939
@@ -169,6 +174,7 @@ class Loader:
                 print(f"{'Enabling' if karras else 'Disabling'} Karras sigmas...")
             if not same_scheduler or not same_karras:
                 self.pipe.scheduler = Config.SCHEDULERS[scheduler](**scheduler_kwargs)
+                self.refiner.scheduler = self.pipe.scheduler
 
         # https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/blob/main/model_index.json
         refiner_kwargs = {
