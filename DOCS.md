@@ -41,4 +41,4 @@ Each model checkpoint has a different aesthetic:
 
 ### Refiner
 
-Use the [ensemble of expert denoisers](https://research.nvidia.com/labs/dir/eDiff-I/) technique, where the first 80% of timesteps are denoised by the base model and the remaining 80% by the [refiner](https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0). Enabled by default. Not available with image-to-image pipelines.
+Use the [ensemble of expert denoisers](https://research.nvidia.com/labs/dir/eDiff-I/) technique, where the first 80% of timesteps are denoised by the base model and the remaining 80% by the [refiner](https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0). Not available with image-to-image pipelines.

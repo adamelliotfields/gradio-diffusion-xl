@@ -74,19 +74,27 @@ def apply_style(prompt, style_id, negative=False):
     return prompt
 
 
+# max 60s per image
 def gpu_duration(**kwargs):
-    base = 20
-    duration = 20
+    loading = 15
+    duration = 15
+    width = kwargs.get("width", 1024)
+    height = kwargs.get("height", 1024)
     scale = kwargs.get("scale", 1)
     num_images = kwargs.get("num_images", 1)
     use_refiner = kwargs.get("use_refiner", False)
+    size = width * height
     if use_refiner:
-        base += 10
+        loading += 10
+    if size > 1_100_000:
+        duration += 5
+    if size > 1_600_000:
+        duration += 5
     if scale == 2:
         duration += 5
-    elif scale == 4:
+    if scale == 4:
         duration += 10
-    return base + (duration * num_images)
+    return loading + (duration * num_images)
 
 
 @spaces.GPU(duration=gpu_duration)
