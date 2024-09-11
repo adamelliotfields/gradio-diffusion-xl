@@ -23,11 +23,12 @@ Config = SimpleNamespace(
         "txt2img": StableDiffusionXLPipeline,
         "img2img": StableDiffusionXLImg2ImgPipeline,
     },
-    MODEL="fluently/Fluently-XL-Final",
+    MODEL="segmind/Segmind-Vega",
     MODELS=[
         "cagliostrolab/animagine-xl-3.1",
         "cyberdelia/CyberRealsticXL",
         "fluently/Fluently-XL-Final",
+        "segmind/Segmind-Vega",
         "SG161222/RealVisXL_V5.0",
         "stabilityai/stable-diffusion-xl-base-1.0",
     ],

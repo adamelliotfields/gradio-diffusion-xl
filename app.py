@@ -225,7 +225,7 @@ with gr.Blocks(
                         use_refiner = gr.Checkbox(
                             elem_classes=["checkbox"],
                             label="Refiner",
-                            value=True,
+                            value=False,
                         )
 
     # Main content

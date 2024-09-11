@@ -23,7 +23,9 @@ Rescale up to 4x using [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) fro
 Each model checkpoint has a different aesthetic:
 
 * [cagliostrolab/animagine-xl-3.1](https://huggingface.co/cagliostrolab/animagine-xl-3.1): anime
+* [cyberdelia/CyberRealisticXL](https://huggingface.co/cyberdelia/CyberRealsticXL): photorealistic
 * [fluently/Fluently-XL-Final](https://huggingface.co/fluently/Fluently-XL-Final): general purpose
+* [segmind/Segmind-Vega](https://huggingface.co/segmind/Segmind-Vega): lightweight general purpose (default)
 * [SG161222/RealVisXL_V5.0](https://huggingface.co/SG161222/RealVisXL_V5.0): photorealistic
 * [stabilityai/stable-diffusion-xl-base-1.0](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0): base
 

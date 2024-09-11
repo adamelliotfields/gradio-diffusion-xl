@@ -165,6 +165,9 @@ def generate(
         TQDM,
     )
 
+    if loader.pipe is None:
+        raise Error(f"RuntimeError: Error loading {model}")
+
     pipe = loader.pipe
     refiner = loader.refiner
 
