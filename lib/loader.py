@@ -38,12 +38,25 @@ class Loader:
             return True
         return False
 
+    def _should_unload_deepcache(self, interval=1):
+        has_deepcache = hasattr(self.pipe, "deepcache")
+        if has_deepcache and interval == 1:
+            return True
+        if has_deepcache and self.pipe.deepcache.params["cache_interval"] != interval:
+            return True
+        return False
+
     def _unload_deepcache(self):
         if self.pipe.deepcache is None:
             return
         print("Unloading DeepCache")
         self.pipe.deepcache.disable()
         delattr(self.pipe, "deepcache")
+        if self.refiner is not None:
+            if hasattr(self.refiner, "deepcache"):
+                print("Unloading DeepCache for refiner")
+                self.refiner.deepcache.disable()
+                delattr(self.refiner, "deepcache")
 
     # don't unload refiner
     def _unload(self, model, deepcache):
@@ -58,6 +71,28 @@ class Loader:
         self._flush()
         for component in to_unload:
             setattr(self, component, None)
+
+    def _load_deepcache(self, interval=1):
+        pipe_has_deepcache = hasattr(self.pipe, "deepcache")
+        if not pipe_has_deepcache and interval == 1:
+            return
+        if pipe_has_deepcache and self.pipe.deepcache.params["cache_interval"] == interval:
+            return
+        print("Loading DeepCache")
+        self.pipe.deepcache = DeepCacheSDHelper(pipe=self.pipe)
+        self.pipe.deepcache.set_params(cache_interval=interval)
+        self.pipe.deepcache.enable()
+
+        if self.refiner is not None:
+            refiner_has_deepcache = hasattr(self.refiner, "deepcache")
+            if not refiner_has_deepcache and interval == 1:
+                return
+            if refiner_has_deepcache and self.refiner.deepcache.params["cache_interval"] == interval:
+                return
+            print("Loading DeepCache for refiner")
+            self.refiner.deepcache = DeepCacheSDHelper(pipe=self.refiner)
+            self.refiner.deepcache.set_params(cache_interval=interval)
+            self.refiner.deepcache.enable()
 
     def _load_pipeline(self, kind, model, progress, **kwargs):
         pipeline = Config.PIPELINES[kind]
@@ -118,28 +153,6 @@ class Loader:
             except Exception as e:
                 print(f"Error loading 4x upscaler: {e}")
                 self.upscaler_4x = None
-
-    def _load_deepcache(self, interval=1):
-        pipe_has_deepcache = hasattr(self.pipe, "deepcache")
-        if not pipe_has_deepcache and interval == 1:
-            return
-        if pipe_has_deepcache and self.pipe.deepcache.params["cache_interval"] == interval:
-            return
-        print("Loading DeepCache")
-        self.pipe.deepcache = DeepCacheSDHelper(pipe=self.pipe)
-        self.pipe.deepcache.set_params(cache_interval=interval)
-        self.pipe.deepcache.enable()
-
-        if self.refiner is not None:
-            refiner_has_deepcache = hasattr(self.refiner, "deepcache")
-            if not refiner_has_deepcache and interval == 1:
-                return
-            if refiner_has_deepcache and self.refiner.deepcache.params["cache_interval"] == interval:
-                return
-            print("Loading DeepCache for refiner")
-            self.refiner.deepcache = DeepCacheSDHelper(pipe=self.refiner)
-            self.refiner.deepcache.set_params(cache_interval=interval)
-            self.refiner.deepcache.enable()
 
     def load(self, kind, model, scheduler, deepcache, scale, karras, refiner, progress):
         scheduler_kwargs = {
