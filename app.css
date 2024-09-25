@@ -15,9 +15,6 @@
   width: auto;
   margin-right: 4px;
 }
-.accordion .tabitem > div {
-  --block-border-width: 1px;
-}
 
 .gallery {
   background-color: var(--bg);
@@ -29,7 +26,7 @@
   overflow-y: auto;
 }
 .gallery, .gallery .grid-wrap {
-  height: calc(100vh - 400px);
+  height: calc(100vh - 422px);
   max-height: none;
 }
 
@@ -120,9 +117,11 @@
 }
 .tab-nav {
   margin-bottom: 16px;
+  flex-wrap: nowrap;
 }
 .tab-nav > button {
   padding-bottom: 8px;
+  text-wrap: wrap;
 }
 
 @keyframes spin {
