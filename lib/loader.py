@@ -1,6 +1,5 @@
 import gc
 from threading import Lock
-from warnings import filterwarnings
 
 import torch
 from DeepCache import DeepCacheSDHelper
@@ -8,10 +7,6 @@ from diffusers.models import AutoencoderKL
 
 from .config import Config
 from .upscaler import RealESRGAN
-
-__import__("diffusers").logging.set_verbosity_error()
-filterwarnings("ignore", category=FutureWarning, module="torch")
-filterwarnings("ignore", category=FutureWarning, module="diffusers")
 
 
 class Loader:
@@ -33,7 +28,6 @@ class Loader:
         gc.collect()
         torch.cuda.empty_cache()
         torch.cuda.ipc_collect()
-        torch.cuda.reset_max_memory_allocated()
         torch.cuda.reset_peak_memory_stats()
         torch.cuda.synchronize()
 
@@ -44,8 +38,18 @@ class Loader:
             return True
         return False
 
-    def _unload(self, model):
+    def _unload_deepcache(self):
+        if self.pipe.deepcache is None:
+            return
+        print("Unloading DeepCache")
+        self.pipe.deepcache.disable()
+        delattr(self.pipe, "deepcache")
+
+    # don't unload refiner
+    def _unload(self, model, deepcache):
         to_unload = []
+        if self._should_unload_deepcache(deepcache):
+            self._unload_deepcache()
         if self._should_unload_pipeline(model):
             to_unload.append("model")
             to_unload.append("pipe")
@@ -55,7 +59,7 @@ class Loader:
         for component in to_unload:
             setattr(self, component, None)
 
-    def _load_pipeline(self, kind, model, tqdm, **kwargs):
+    def _load_pipeline(self, kind, model, progress, **kwargs):
         pipeline = Config.PIPELINES[kind]
         if self.pipe is None:
             try:
@@ -81,9 +85,9 @@ class Loader:
         if not isinstance(self.pipe, pipeline):
             self.pipe = pipeline.from_pipe(self.pipe).to("cuda")
         if self.pipe is not None:
-            self.pipe.set_progress_bar_config(disable=not tqdm)
+            self.pipe.set_progress_bar_config(disable=progress is not None)
 
-    def _load_refiner(self, refiner, tqdm, **kwargs):
+    def _load_refiner(self, refiner, progress, **kwargs):
         if refiner and self.refiner is None:
             model = Config.REFINER_MODEL
             pipeline = Config.PIPELINES["img2img"]
@@ -95,7 +99,7 @@ class Loader:
                 self.refiner = None
                 return
         if self.refiner is not None:
-            self.refiner.set_progress_bar_config(disable=not tqdm)
+            self.refiner.set_progress_bar_config(disable=progress is not None)
 
     def _load_upscaler(self, scale=1):
         if scale == 2 and self.upscaler_2x is None:
@@ -117,29 +121,27 @@ class Loader:
 
     def _load_deepcache(self, interval=1):
         pipe_has_deepcache = hasattr(self.pipe, "deepcache")
+        if not pipe_has_deepcache and interval == 1:
+            return
         if pipe_has_deepcache and self.pipe.deepcache.params["cache_interval"] == interval:
             return
-        if pipe_has_deepcache:
-            self.pipe.deepcache.disable()
-        else:
-            self.pipe.deepcache = DeepCacheSDHelper(pipe=self.pipe)
+        print("Loading DeepCache")
+        self.pipe.deepcache = DeepCacheSDHelper(pipe=self.pipe)
         self.pipe.deepcache.set_params(cache_interval=interval)
         self.pipe.deepcache.enable()
 
         if self.refiner is not None:
             refiner_has_deepcache = hasattr(self.refiner, "deepcache")
+            if not refiner_has_deepcache and interval == 1:
+                return
             if refiner_has_deepcache and self.refiner.deepcache.params["cache_interval"] == interval:
                 return
-            if refiner_has_deepcache:
-                self.refiner.deepcache.disable()
-            else:
-                self.refiner.deepcache = DeepCacheSDHelper(pipe=self.refiner)
+            print("Loading DeepCache for refiner")
+            self.refiner.deepcache = DeepCacheSDHelper(pipe=self.refiner)
             self.refiner.deepcache.set_params(cache_interval=interval)
             self.refiner.deepcache.enable()
 
-    def load(self, kind, model, scheduler, deepcache, scale, karras, refiner, tqdm):
-        model_lower = model.lower()
-
+    def load(self, kind, model, scheduler, deepcache, scale, karras, refiner, progress):
         scheduler_kwargs = {
             "beta_start": 0.00085,
             "beta_end": 0.012,
@@ -156,7 +158,7 @@ class Loader:
             scheduler_kwargs["clip_sample"] = False
             scheduler_kwargs["set_alpha_to_one"] = False
 
-        if model_lower not in Config.MODEL_CHECKPOINTS.keys():
+        if model.lower() not in Config.MODEL_CHECKPOINTS.keys():
             variant = "fp16"
         else:
             variant = None
@@ -170,8 +172,8 @@ class Loader:
             "vae": AutoencoderKL.from_pretrained(Config.VAE_MODEL, torch_dtype=dtype),
         }
 
-        self._unload(model)
-        self._load_pipeline(kind, model, tqdm, **pipe_kwargs)
+        self._unload(model, deepcache)
+        self._load_pipeline(kind, model, progress, **pipe_kwargs)
 
         # error loading model
         if self.pipe is None:
@@ -184,7 +186,7 @@ class Loader:
         )
 
         # same model, different scheduler
-        if self.model.lower() == model_lower:
+        if self.model.lower() == model.lower():
             if not same_scheduler:
                 print(f"Switching to {scheduler}...")
             if not same_karras:
@@ -207,6 +209,6 @@ class Loader:
             "text_encoder_2": self.pipe.text_encoder_2,
         }
 
-        self._load_refiner(refiner, tqdm, **refiner_kwargs)
-        self._load_upscaler(scale)
+        self._load_refiner(refiner, progress, **refiner_kwargs)
         self._load_deepcache(deepcache)
+        self._load_upscaler(scale)

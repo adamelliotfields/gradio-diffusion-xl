@@ -1,77 +1,51 @@
-import functools
-import inspect
-import json
 import re
 import time
 from datetime import datetime
 from itertools import product
-from typing import Callable, TypeVar
 
-import anyio
-import spaces
 import torch
-from anyio import Semaphore
 from compel import Compel, ReturnedEmbeddingsType
 from compel.prompt_parser import PromptParser
-from typing_extensions import ParamSpec
+from spaces import GPU
 
+from .config import Config
 from .loader import Loader
-
-__import__("warnings").filterwarnings("ignore", category=FutureWarning, module="transformers")
-__import__("transformers").logging.set_verbosity_error()
-
-T = TypeVar("T")
-P = ParamSpec("P")
-
-MAX_CONCURRENT_THREADS = 1
-MAX_THREADS_GUARD = Semaphore(MAX_CONCURRENT_THREADS)
-
-with open("./data/styles.json") as f:
-    STYLES = json.load(f)
+from .utils import load_json
 
 
-# like the original but supports args and kwargs instead of a dict
-# https://github.com/huggingface/huggingface-inference-toolkit/blob/0.2.0/src/huggingface_inference_toolkit/async_utils.py
-async def async_call(fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
-    async with MAX_THREADS_GUARD:
-        sig = inspect.signature(fn)
-        bound_args = sig.bind(*args, **kwargs)
-        bound_args.apply_defaults()
-        partial_fn = functools.partial(fn, **bound_args.arguments)
-        return await anyio.to_thread.run_sync(partial_fn)
-
-
-# parse prompts with arrays
-def parse_prompt(prompt: str) -> list[str]:
+def parse_prompt_with_arrays(prompt: str) -> list[str]:
     arrays = re.findall(r"\[\[(.*?)\]\]", prompt)
 
     if not arrays:
         return [prompt]
 
-    tokens = [item.split(",") for item in arrays]
-    combinations = list(product(*tokens))
-    prompts = []
+    tokens = [item.split(",") for item in arrays]  # [("a", "b"), (1, 2)]
+    combinations = list(product(*tokens))  # [("a", 1), ("a", 2), ("b", 1), ("b", 2)]
 
+    # find all the arrays in the prompt and replace them with tokens
+    prompts = []
     for combo in combinations:
         current_prompt = prompt
         for i, token in enumerate(combo):
             current_prompt = current_prompt.replace(f"[[{arrays[i]}]]", token.strip(), 1)
         prompts.append(current_prompt)
-
     return prompts
 
 
-def apply_style(prompt, style_id, negative=False):
-    global STYLES
-    if not style_id or style_id == "None":
-        return prompt
-    for style in STYLES:
-        if style["id"] == style_id:
-            if negative:
-                return prompt + " . " + style["negative_prompt"]
-            else:
-                return style["prompt"].format(prompt=prompt)
-    return prompt
+def apply_style(positive_prompt, negative_prompt, style_id="none"):
+    if style_id.lower() == "none":
+        return (positive_prompt, negative_prompt)
+
+    styles = load_json("./data/styles.json")
+    style = styles.get(style_id)
+    if style is None:
+        return (positive_prompt, negative_prompt)
+
+    style_base = style.get("_base", {})
+    return (
+        style.get("positive").format(prompt=positive_prompt, _base=style_base.get("positive")).strip(),
+        style.get("negative").format(prompt=negative_prompt, _base=style_base.get("negative")).strip(),
+    )
 
 
 # max 60s per image
@@ -97,7 +71,7 @@ def gpu_duration(**kwargs):
     return loading + (duration * num_images)
 
 
-@spaces.GPU(duration=gpu_duration)
+@GPU(duration=gpu_duration)
 def generate(
     positive_prompt,
     negative_prompt="",
@@ -114,53 +88,51 @@ def generate(
     num_images=1,
     use_karras=False,
     use_refiner=False,
-    Info: Callable[[str], None] = None,
     Error=Exception,
+    Info=None,
     progress=None,
 ):
     if not torch.cuda.is_available():
-        raise Error("RuntimeError: CUDA not available")
+        raise Error("CUDA not available")
 
     # https://pytorch.org/docs/stable/generated/torch.manual_seed.html
     if seed is None or seed < 0:
-        seed = int(datetime.now().timestamp() * 1_000_000) % (2**64)
+        seed = int(datetime.now().timestamp() * 1e6) % (2**64)
 
     KIND = "txt2img"
     CURRENT_STEP = 0
     CURRENT_IMAGE = 1
     EMBEDDINGS_TYPE = ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED
 
-    if progress is not None:
-        TQDM = False
-        progress((0, inference_steps), desc=f"Generating image 1/{num_images}")
-    else:
-        TQDM = True
-
+    # custom progress bar for multiple images
     def callback_on_step_end(pipeline, step, timestep, latents):
         nonlocal CURRENT_IMAGE, CURRENT_STEP
 
-        if progress is None:
-            return latents
+        if progress is not None:
+            # calculate total steps for img2img based on denoising strength
+            strength = 1
+            total_steps = min(int(inference_steps * strength), inference_steps)
 
-        strength = 1
-        total_steps = min(int(inference_steps * strength), inference_steps)
+            # if steps are different we're in the refiner
+            refining = False
+            if CURRENT_STEP == step:
+                CURRENT_STEP = step + 1
+            else:
+                refining = True
+                CURRENT_STEP += 1
 
-        # if steps are different we're in the refiner
-        refining = False
-        if CURRENT_STEP == step:
-            CURRENT_STEP = step + 1
-        else:
-            refining = True
-            CURRENT_STEP += 1
-
-        progress(
-            (CURRENT_STEP, total_steps),
-            desc=f"{'Refining' if refining else 'Generating'} image {CURRENT_IMAGE}/{num_images}",
-        )
-
+            progress(
+                (CURRENT_STEP, total_steps),
+                desc=f"{'Refining' if refining else 'Generating'} image {CURRENT_IMAGE}/{num_images}",
+            )
         return latents
 
     start = time.perf_counter()
+    print(f"Generating {num_images} image{'s' if num_images > 1 else ''}")
+
+    if Config.ZERO_GPU and progress is not None:
+        progress((100, 100), desc="ZeroGPU init")
+
     loader = Loader()
     loader.load(
         KIND,
@@ -170,11 +142,11 @@ def generate(
         scale,
         use_karras,
         use_refiner,
-        TQDM,
+        progress,
     )
 
     if loader.pipe is None:
-        raise Error(f"RuntimeError: Error loading {model}")
+        raise Error(f"Error loading {model}")
 
     pipe = loader.pipe
     refiner = loader.refiner
@@ -205,21 +177,21 @@ def generate(
 
     images = []
     current_seed = seed
-
     for i in range(num_images):
-        # seeded generator for each iteration
         generator = torch.Generator(device=pipe.device).manual_seed(current_seed)
 
         try:
-            styled_negative_prompt = apply_style(negative_prompt, style, negative=True)
-            all_positive_prompts = parse_prompt(positive_prompt)
-            prompt_index = i % len(all_positive_prompts)
-            prompt = all_positive_prompts[prompt_index]
-            styled_prompt = apply_style(prompt, style)
-            conditioning_1, pooled_1 = compel_1([styled_prompt, styled_negative_prompt])
-            conditioning_2, pooled_2 = compel_2([styled_prompt, styled_negative_prompt])
+            positive_prompts = parse_prompt_with_arrays(positive_prompt)
+            index = i % len(positive_prompts)
+            positive_styled, negative_styled = apply_style(positive_prompts[index], negative_prompt, style)
+
+            if negative_styled.startswith("(), "):
+                negative_styled = negative_styled[4:]
+
+            conditioning_1, pooled_1 = compel_1([positive_styled, negative_styled])
+            conditioning_2, pooled_2 = compel_2([positive_styled, negative_styled])
         except PromptParser.ParsingException:
-            raise Error("ValueError: Invalid prompt")
+            raise Error("Invalid prompt")
 
         # refiner expects latents; upscaler expects numpy array
         pipe_output_type = "pil"
@@ -272,12 +244,12 @@ def generate(
             if scale > 1:
                 image = upscaler.predict(image)
             images.append((image, str(current_seed)))
+            current_seed += 1
         except Exception as e:
-            raise Error(f"RuntimeError: {e}")
+            raise Error(f"{e}")
         finally:
             CURRENT_STEP = 0
             CURRENT_IMAGE += 1
-            current_seed += 1
 
     diff = time.perf_counter() - start
     if Info:
