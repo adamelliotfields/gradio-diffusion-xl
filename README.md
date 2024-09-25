@@ -47,11 +47,10 @@ Gradio app for Stable Diffusion XL featuring:
 
 * txt2img pipeline with refiner (img2img with IP-Adapter and ControlNet coming soon)
 * Curated models (LoRAs and TIs coming soon)
-* 100+ styles from sdxl_prompt_styler
-* 150+ prompts from StableStudio
 * Compel prompt weighting
+* Dozens of styles and starter prompts
 * Multiple samplers with Karras scheduling
-* DeepCache for speed
+* DeepCache available
 * Real-ESRGAN upscaling
 
 ## Usage
