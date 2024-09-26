@@ -1,3 +1,4 @@
+import gc
 import re
 import time
 from datetime import datetime
@@ -150,12 +151,7 @@ def generate(
 
     pipe = loader.pipe
     refiner = loader.refiner
-
-    upscaler = None
-    if scale == 2:
-        upscaler = loader.upscaler_2x
-    if scale == 4:
-        upscaler = loader.upscaler_4x
+    upscaler = loader.upscaler
 
     # prompt embeds for base and refiner
     compel_1 = Compel(
@@ -250,6 +246,10 @@ def generate(
         finally:
             CURRENT_STEP = 0
             CURRENT_IMAGE += 1
+
+    # cleanup
+    loader.collect()
+    gc.collect()
 
     diff = time.perf_counter() - start
     if Info:

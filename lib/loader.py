@@ -20,21 +20,25 @@ class Loader:
                 cls._instance.pipe = None
                 cls._instance.model = None
                 cls._instance.refiner = None
-                cls._instance.upscaler_2x = None
-                cls._instance.upscaler_4x = None
+                cls._instance.upscaler = None
         return cls._instance
 
-    def _flush(self):
-        gc.collect()
-        torch.cuda.empty_cache()
-        torch.cuda.ipc_collect()
-        torch.cuda.reset_peak_memory_stats()
-        torch.cuda.synchronize()
-
-    def _should_unload_pipeline(self, model=""):
-        if self.pipe is None:
+    def _should_offload_refiner(self, model=""):
+        if self.refiner is None:
             return False
-        if self.model.lower() != model.lower():
+        if self.model and self.model.lower() != model.lower():
+            return True
+        return False
+
+    def _should_unload_refiner(self, refiner=False):
+        if self.refiner is None:
+            return False
+        if not refiner:
+            return True
+        return False
+
+    def _should_unload_upscaler(self, scale=1):
+        if self.upscaler is not None and self.upscaler.scale != scale:
             return True
         return False
 
@@ -46,31 +50,93 @@ class Loader:
             return True
         return False
 
-    def _unload_deepcache(self):
-        if self.pipe.deepcache is None:
-            return
-        print("Unloading DeepCache")
-        self.pipe.deepcache.disable()
-        delattr(self.pipe, "deepcache")
-        if self.refiner is not None:
-            if hasattr(self.refiner, "deepcache"):
-                print("Unloading DeepCache for refiner")
-                self.refiner.deepcache.disable()
-                delattr(self.refiner, "deepcache")
+    def _should_unload_pipeline(self, model=""):
+        if self.pipe is None:
+            return False
+        if self.model and self.model.lower() != model.lower():
+            return True
+        return False
 
-    # don't unload refiner
-    def _unload(self, model, deepcache):
+    def _offload_refiner(self):
+        if self.refiner is not None:
+            self.refiner.to("cpu", silence_dtype_warnings=True)
+            self.refiner.vae = None
+            self.refiner.scheduler = None
+            self.refiner.tokenizer_2 = None
+            self.refiner.text_encoder_2 = None
+
+    def _unload_refiner(self):
+        # already on CPU from offloading
+        print("Unloading refiner")
+
+    def _unload_upscaler(self):
+        print(f"Unloading {self.upscaler.scale}x upscaler")
+        self.upscaler.to("cpu")
+
+    def _unload_deepcache(self):
+        if self.pipe.deepcache is not None:
+            print("Unloading DeepCache")
+            self.pipe.deepcache.disable()
+            delattr(self.pipe, "deepcache")
+            if self.refiner is not None:
+                if hasattr(self.refiner, "deepcache"):
+                    print("Unloading DeepCache for refiner")
+                    self.refiner.deepcache.disable()
+                    delattr(self.refiner, "deepcache")
+
+    def _unload_pipeline(self):
+        print(f"Unloading {self.model}")
+        self.pipe.to("cpu", silence_dtype_warnings=True)
+
+    def _unload(self, model, refiner, deepcache, scale):
         to_unload = []
-        if self._should_unload_deepcache(deepcache):
+        if self._should_unload_deepcache(deepcache):  # remove deepcache first
             self._unload_deepcache()
+
+        if self._should_offload_refiner(model):
+            self._offload_refiner()
+
+        if self._should_unload_refiner(refiner):
+            self._unload_refiner()
+            to_unload.append("refiner")
+
+        if self._should_unload_upscaler(scale):
+            self._unload_upscaler()
+            to_unload.append("upscaler")
+
         if self._should_unload_pipeline(model):
+            self._unload_pipeline()
             to_unload.append("model")
             to_unload.append("pipe")
-        for component in to_unload:
-            delattr(self, component)
-        self._flush()
+
+        self.collect()
         for component in to_unload:
             setattr(self, component, None)
+            gc.collect()
+
+    def _load_refiner(self, refiner, progress, **kwargs):
+        if refiner and self.refiner is None:
+            model = Config.REFINER_MODEL
+            pipeline = Config.PIPELINES["img2img"]
+            try:
+                print(f"Loading {model}")
+                self.refiner = pipeline.from_pretrained(model, **kwargs).to("cuda")
+            except Exception as e:
+                print(f"Error loading {model}: {e}")
+                self.refiner = None
+                return
+        if self.refiner is not None:
+            self.refiner.set_progress_bar_config(disable=progress is not None)
+
+    def _load_upscaler(self, scale=1):
+        if self.upscaler is None and scale > 1:
+            try:
+                print(f"Loading {scale}x upscaler")
+                self.upscaler = RealESRGAN(scale, device=self.pipe.device)
+                self.upscaler.load_weights()
+            except Exception as e:
+                print(f"Error loading {scale}x upscaler: {e}")
+                self.upscaler = None
 
     def _load_deepcache(self, interval=1):
         pipe_has_deepcache = hasattr(self.pipe, "deepcache")
@@ -98,7 +164,7 @@ class Loader:
         pipeline = Config.PIPELINES[kind]
         if self.pipe is None:
             try:
-                print(f"Loading {model}...")
+                print(f"Loading {model}")
                 self.model = model
                 if model.lower() in Config.MODEL_CHECKPOINTS.keys():
                     self.pipe = pipeline.from_single_file(
@@ -112,6 +178,7 @@ class Loader:
                     self.refiner.scheduler = self.pipe.scheduler
                     self.refiner.tokenizer_2 = self.pipe.tokenizer_2
                     self.refiner.text_encoder_2 = self.pipe.text_encoder_2
+                    self.refiner.to(self.pipe.device)
             except Exception as e:
                 print(f"Error loading {model}: {e}")
                 self.model = None
@@ -122,37 +189,11 @@ class Loader:
         if self.pipe is not None:
             self.pipe.set_progress_bar_config(disable=progress is not None)
 
-    def _load_refiner(self, refiner, progress, **kwargs):
-        if refiner and self.refiner is None:
-            model = Config.REFINER_MODEL
-            pipeline = Config.PIPELINES["img2img"]
-            try:
-                print(f"Loading {model}...")
-                self.refiner = pipeline.from_pretrained(model, **kwargs).to("cuda")
-            except Exception as e:
-                print(f"Error loading {model}: {e}")
-                self.refiner = None
-                return
-        if self.refiner is not None:
-            self.refiner.set_progress_bar_config(disable=progress is not None)
-
-    def _load_upscaler(self, scale=1):
-        if scale == 2 and self.upscaler_2x is None:
-            try:
-                print("Loading 2x upscaler...")
-                self.upscaler_2x = RealESRGAN(2, "cuda")
-                self.upscaler_2x.load_weights()
-            except Exception as e:
-                print(f"Error loading 2x upscaler: {e}")
-                self.upscaler_2x = None
-        if scale == 4 and self.upscaler_4x is None:
-            try:
-                print("Loading 4x upscaler...")
-                self.upscaler_4x = RealESRGAN(4, "cuda")
-                self.upscaler_4x.load_weights()
-            except Exception as e:
-                print(f"Error loading 4x upscaler: {e}")
-                self.upscaler_4x = None
+    def collect(self):
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+        torch.cuda.reset_peak_memory_stats()
+        torch.cuda.synchronize()
 
     def load(self, kind, model, scheduler, deepcache, scale, karras, refiner, progress):
         scheduler_kwargs = {
@@ -185,7 +226,7 @@ class Loader:
             "vae": AutoencoderKL.from_pretrained(Config.VAE_MODEL, torch_dtype=dtype),
         }
 
-        self._unload(model, deepcache)
+        self._unload(model, refiner, deepcache, scale)
         self._load_pipeline(kind, model, progress, **pipe_kwargs)
 
         # error loading model
@@ -201,9 +242,9 @@ class Loader:
         # same model, different scheduler
         if self.model.lower() == model.lower():
             if not same_scheduler:
-                print(f"Switching to {scheduler}...")
+                print(f"Switching to {scheduler}")
             if not same_karras:
-                print(f"{'Enabling' if karras else 'Disabling'} Karras sigmas...")
+                print(f"{'Enabling' if karras else 'Disabling'} Karras sigmas")
             if not same_scheduler or not same_karras:
                 self.pipe.scheduler = Config.SCHEDULERS[scheduler](**scheduler_kwargs)
                 if self.refiner is not None:
@@ -222,6 +263,6 @@ class Loader:
             "text_encoder_2": self.pipe.text_encoder_2,
         }
 
-        self._load_refiner(refiner, progress, **refiner_kwargs)
+        self._load_refiner(refiner, progress, **refiner_kwargs)  # load refiner before deepcache
         self._load_deepcache(deepcache)
         self._load_upscaler(scale)

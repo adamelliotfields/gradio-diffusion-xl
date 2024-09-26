@@ -264,6 +264,10 @@ class RealESRGAN:
             scale=scale,
         )
 
+    def to(self, device):
+        self.device = device
+        self.model.to(device=device)
+
     def load_weights(self):
         assert self.scale in [2, 4], "You can download models only with scales: 2, 4"
         config = HF_MODELS[self.scale]
