@@ -251,7 +251,9 @@ def generate(
     loader.collect()
     gc.collect()
 
-    diff = time.perf_counter() - start
+    end = time.perf_counter()
+    msg = f"Generated {len(images)} image{'s' if len(images) > 1 else ''} in {end - start:.2f}s"
+    print(msg)
     if Info:
-        Info(f"Generated {len(images)} image{'s' if len(images) > 1 else ''} in {diff:.2f}s")
+        Info(msg)
     return images

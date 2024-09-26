@@ -10,6 +10,7 @@ from .utils import (
     enable_progress_bars,
     load_json,
     read_file,
+    timer,
 )
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "generate",
     "load_json",
     "read_file",
+    "timer",
 ]

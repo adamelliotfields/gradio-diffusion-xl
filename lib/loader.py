@@ -7,6 +7,7 @@ from diffusers.models import AutoencoderKL
 
 from .config import Config
 from .upscaler import RealESRGAN
+from .utils import timer
 
 
 class Loader:
@@ -23,13 +24,15 @@ class Loader:
                 cls._instance.upscaler = None
         return cls._instance
 
-    def _should_offload_refiner(self, model=""):
+    # switching models
+    def _should_reset_refiner(self, model=""):
         if self.refiner is None:
             return False
         if self.model and self.model.lower() != model.lower():
             return True
         return False
 
+    # switching refiner
     def _should_unload_refiner(self, refiner=False):
         if self.refiner is None:
             return False
@@ -57,44 +60,45 @@ class Loader:
             return True
         return False
 
-    def _offload_refiner(self):
+    def _reset_refiner(self):
         if self.refiner is not None:
-            self.refiner.to("cpu", silence_dtype_warnings=True)
             self.refiner.vae = None
             self.refiner.scheduler = None
             self.refiner.tokenizer_2 = None
             self.refiner.text_encoder_2 = None
 
     def _unload_refiner(self):
-        # already on CPU from offloading
-        print("Unloading refiner")
+        if self.refiner is not None:
+            with timer("Unloading refiner"):
+                self.refiner.to("cpu", silence_dtype_warnings=True)
 
     def _unload_upscaler(self):
-        print(f"Unloading {self.upscaler.scale}x upscaler")
-        self.upscaler.to("cpu")
+        if self.upscaler is not None:
+            with timer(f"Unloading {self.upscaler.scale}x upscaler"):
+                self.upscaler.to("cpu")
 
     def _unload_deepcache(self):
         if self.pipe.deepcache is not None:
-            print("Unloading DeepCache")
+            print("Disabling DeepCache")
             self.pipe.deepcache.disable()
             delattr(self.pipe, "deepcache")
             if self.refiner is not None:
                 if hasattr(self.refiner, "deepcache"):
-                    print("Unloading DeepCache for refiner")
                     self.refiner.deepcache.disable()
                     delattr(self.refiner, "deepcache")
 
     def _unload_pipeline(self):
-        print(f"Unloading {self.model}")
-        self.pipe.to("cpu", silence_dtype_warnings=True)
+        if self.pipe is not None:
+            with timer(f"Unloading {self.model}"):
+                self.pipe.to("cpu", silence_dtype_warnings=True)
 
     def _unload(self, model, refiner, deepcache, scale):
         to_unload = []
         if self._should_unload_deepcache(deepcache):  # remove deepcache first
             self._unload_deepcache()
 
-        if self._should_offload_refiner(model):
-            self._offload_refiner()
+        if self._should_reset_refiner(model):
+            self._reset_refiner()
 
         if self._should_unload_refiner(refiner):
             self._unload_refiner()
@@ -119,8 +123,8 @@ class Loader:
             model = Config.REFINER_MODEL
             pipeline = Config.PIPELINES["img2img"]
             try:
-                print(f"Loading {model}")
-                self.refiner = pipeline.from_pretrained(model, **kwargs).to("cuda")
+                with timer(f"Loading {model}"):
+                    self.refiner = pipeline.from_pretrained(model, **kwargs).to("cuda")
             except Exception as e:
                 print(f"Error loading {model}: {e}")
                 self.refiner = None
@@ -131,9 +135,9 @@ class Loader:
     def _load_upscaler(self, scale=1):
         if self.upscaler is None and scale > 1:
             try:
-                print(f"Loading {scale}x upscaler")
-                self.upscaler = RealESRGAN(scale, device=self.pipe.device)
-                self.upscaler.load_weights()
+                with timer(f"Loading {scale}x upscaler"):
+                    self.upscaler = RealESRGAN(scale, device=self.pipe.device)
+                    self.upscaler.load_weights()
             except Exception as e:
                 print(f"Error loading {scale}x upscaler: {e}")
                 self.upscaler = None
@@ -144,7 +148,7 @@ class Loader:
             return
         if pipe_has_deepcache and self.pipe.deepcache.params["cache_interval"] == interval:
             return
-        print("Loading DeepCache")
+        print("Enabling DeepCache")
         self.pipe.deepcache = DeepCacheSDHelper(pipe=self.pipe)
         self.pipe.deepcache.set_params(cache_interval=interval)
         self.pipe.deepcache.enable()
@@ -155,7 +159,6 @@ class Loader:
                 return
             if refiner_has_deepcache and self.refiner.deepcache.params["cache_interval"] == interval:
                 return
-            print("Loading DeepCache for refiner")
             self.refiner.deepcache = DeepCacheSDHelper(pipe=self.refiner)
             self.refiner.deepcache.set_params(cache_interval=interval)
             self.refiner.deepcache.enable()
@@ -164,21 +167,21 @@ class Loader:
         pipeline = Config.PIPELINES[kind]
         if self.pipe is None:
             try:
-                print(f"Loading {model}")
-                self.model = model
-                if model.lower() in Config.MODEL_CHECKPOINTS.keys():
-                    self.pipe = pipeline.from_single_file(
-                        f"https://huggingface.co/{model}/{Config.MODEL_CHECKPOINTS[model.lower()]}",
-                        **kwargs,
-                    ).to("cuda")
-                else:
-                    self.pipe = pipeline.from_pretrained(model, **kwargs).to("cuda")
-                if self.refiner is not None:
-                    self.refiner.vae = self.pipe.vae
-                    self.refiner.scheduler = self.pipe.scheduler
-                    self.refiner.tokenizer_2 = self.pipe.tokenizer_2
-                    self.refiner.text_encoder_2 = self.pipe.text_encoder_2
-                    self.refiner.to(self.pipe.device)
+                with timer(f"Loading {model}"):
+                    self.model = model
+                    if model.lower() in Config.MODEL_CHECKPOINTS.keys():
+                        self.pipe = pipeline.from_single_file(
+                            f"https://huggingface.co/{model}/{Config.MODEL_CHECKPOINTS[model.lower()]}",
+                            **kwargs,
+                        ).to("cuda")
+                    else:
+                        self.pipe = pipeline.from_pretrained(model, **kwargs).to("cuda")
+                    if self.refiner is not None:
+                        self.refiner.vae = self.pipe.vae
+                        self.refiner.scheduler = self.pipe.scheduler
+                        self.refiner.tokenizer_2 = self.pipe.tokenizer_2
+                        self.refiner.text_encoder_2 = self.pipe.text_encoder_2
+                        self.refiner.to(self.pipe.device)
             except Exception as e:
                 print(f"Error loading {model}: {e}")
                 self.model = None
