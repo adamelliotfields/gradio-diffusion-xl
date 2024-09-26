@@ -1,23 +1,10 @@
 import argparse
 import json
-import os
 import random
-from warnings import filterwarnings
 
 import gradio as gr
-from diffusers.utils import logging as diffusers_logging
-from transformers import logging as transformers_logging
 
-from lib import Config, async_call, download_repo_files, generate, read_file
-
-filterwarnings("ignore", category=FutureWarning, module="diffusers")
-filterwarnings("ignore", category=FutureWarning, module="transformers")
-
-diffusers_logging.set_verbosity_error()
-transformers_logging.set_verbosity_error()
-
-diffusers_logging.disable_progress_bar()
-transformers_logging.disable_progress_bar()
+from lib import Config, async_call, disable_progress_bars, download_repo_files, generate, read_file
 
 # the CSS `content` attribute expects a string so we need to wrap the number in quotes
 refresh_seed_js = """
@@ -337,7 +324,7 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--port", type=int, metavar="INT", default=7860)
     args = parser.parse_args()
 
-    # download to hub cache
+    disable_progress_bars()
     for repo_id, allow_patterns in Config.HF_MODELS.items():
         download_repo_files(repo_id, allow_patterns, token=Config.HF_TOKEN)
 

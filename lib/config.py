@@ -1,6 +1,8 @@
 import os
 from importlib import import_module
+from importlib.util import find_spec
 from types import SimpleNamespace
+from warnings import filterwarnings
 
 from diffusers import (
     DDIMScheduler,
@@ -11,9 +13,21 @@ from diffusers import (
     StableDiffusionXLImg2ImgPipeline,
     StableDiffusionXLPipeline,
 )
+from diffusers.utils import logging as diffusers_logging
+from transformers import logging as transformers_logging
 
 # improved GPU handling and progress bars; set before importing spaces
-os.environ["ZEROGPU_V2"] = "true"
+os.environ["ZEROGPU_V2"] = "1"
+
+# use Rust downloader
+if find_spec("hf_transfer"):
+    os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
+
+filterwarnings("ignore", category=FutureWarning, module="diffusers")
+filterwarnings("ignore", category=FutureWarning, module="transformers")
+
+diffusers_logging.set_verbosity_error()
+transformers_logging.set_verbosity_error()
 
 _sdxl_refiner_files = [
     "scheduler/scheduler_config.json",
