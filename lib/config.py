@@ -16,10 +16,10 @@ from diffusers import (
 from diffusers.utils import logging as diffusers_logging
 from transformers import logging as transformers_logging
 
-# improved GPU handling and progress bars; set before importing spaces
+# Improved GPU handling and progress bars; set before importing spaces
 os.environ["ZEROGPU_V2"] = "1"
 
-# use Rust downloader
+# Use Rust-based downloader; errors if enabled and not installed
 if find_spec("hf_transfer"):
     os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 
@@ -29,6 +29,7 @@ filterwarnings("ignore", category=FutureWarning, module="transformers")
 diffusers_logging.set_verbosity_error()
 transformers_logging.set_verbosity_error()
 
+# Standard refiner structure
 _sdxl_refiner_files = [
     "scheduler/scheduler_config.json",
     "text_encoder_2/config.json",
@@ -44,6 +45,7 @@ _sdxl_refiner_files = [
     "model_index.json",
 ]
 
+# Standard SDXL structure
 _sdxl_files = [
     *_sdxl_refiner_files,
     "text_encoder/config.json",
@@ -54,39 +56,30 @@ _sdxl_files = [
     "tokenizer/vocab.json",
 ]
 
+# Using namespace instead of dataclass for simplicity
 Config = SimpleNamespace(
     HF_TOKEN=os.environ.get("HF_TOKEN", None),
-    CIVIT_TOKEN=os.environ.get("CIVIT_TOKEN", None),
     ZERO_GPU=import_module("spaces").config.Config.zero_gpu,
-    MONO_FONTS=["monospace"],
-    SANS_FONTS=[
-        "sans-serif",
-        "Apple Color Emoji",
-        "Segoe UI Emoji",
-        "Segoe UI Symbol",
-        "Noto Color Emoji",
-    ],
-    PIPELINES={
-        "txt2img": StableDiffusionXLPipeline,
-        "img2img": StableDiffusionXLImg2ImgPipeline,
-    },
     HF_MODELS={
         "segmind/Segmind-Vega": [*_sdxl_files],
         "stabilityai/stable-diffusion-xl-base-1.0": [*_sdxl_files, "vae_1_0/config.json"],
         "stabilityai/stable-diffusion-xl-refiner-1.0": [*_sdxl_refiner_files],
     },
+    PIPELINES={
+        "txt2img": StableDiffusionXLPipeline,
+        "img2img": StableDiffusionXLImg2ImgPipeline,
+    },
     MODEL="segmind/Segmind-Vega",
     MODELS=[
-        "cagliostrolab/animagine-xl-3.1",
         "cyberdelia/CyberRealsticXL",
         "fluently/Fluently-XL-Final",
         "segmind/Segmind-Vega",
         "SG161222/RealVisXL_V5.0",
         "stabilityai/stable-diffusion-xl-base-1.0",
     ],
+    # Single-file model weights
     MODEL_CHECKPOINTS={
-        # keep keys lowercase
-        "cagliostrolab/animagine-xl-3.1": "animagine-xl-3.1.safetensors",
+        # keep keys lowercase for case-insensitive matching in the loader
         "cyberdelia/cyberrealsticxl": "CyberRealisticXLPlay_V1.0.safetensors",  # typo in "realistic"
         "fluently/fluently-xl-final": "FluentlyXL-Final.safetensors",
         "sg161222/realvisxl_v5.0": "RealVisXL_V5.0_fp16.safetensors",
@@ -101,12 +94,11 @@ Config = SimpleNamespace(
         "Euler": EulerDiscreteScheduler,
         "Euler a": EulerAncestralDiscreteScheduler,
     },
-    STYLE="enhance",
     WIDTH=1024,
     HEIGHT=1024,
     NUM_IMAGES=1,
     SEED=-1,
-    GUIDANCE_SCALE=7.5,
+    GUIDANCE_SCALE=6,
     INFERENCE_STEPS=40,
     DEEPCACHE_INTERVAL=1,
     SCALE=1,

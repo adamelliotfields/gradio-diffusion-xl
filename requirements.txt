@@ -1,19 +1,12 @@
-anyio==4.4.0
-accelerate
-einops==0.8.0
+anyio==4.6.1
 compel==2.0.3
 deepcache==0.1.1
-diffusers==0.30.2
-h2
+diffusers==0.30.3
+einops==0.8.0
+gradio==4.44.1
 hf-transfer
-httpx
-gradio==4.41.0
 numpy==1.26.4
-ruff==0.5.7
-spaces
+ruff==0.6.9
+spaces==0.30.4
 torch==2.2.0
 torchvision==0.17.0
-transformers==4.43.4
-# TODO: unpin once fixed upstream
-# https://github.com/gradio-app/gradio/issues/9278
-fastapi==0.112.2

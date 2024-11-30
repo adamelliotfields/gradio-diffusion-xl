@@ -26,7 +26,7 @@
   overflow-y: auto;
 }
 .gallery, .gallery .grid-wrap {
-  height: calc(100vh - 422px);
+  height: calc(100vh - 430px);
   max-height: none;
 }
 
@@ -59,24 +59,6 @@
 #intro > div > svg:is(.dark *) {
   fill: #10b981 !important;
 }
-#intro nav {
-  display: flex;
-  column-gap: 0.5rem;
-}
-#intro nav a, #intro nav span {
-  white-space: nowrap;
-  font-family: monospace;
-}
-#intro nav span {
-  font-weight: 500;
-  color: var(--body-text-color);
-}
-#intro nav a {
-  color: var(--body-text-color-subdued);
-}
-#intro nav a:hover {
-  color: var(--body-text-color);
-}
 
 .popover {
   position: relative;
@@ -100,10 +82,15 @@
   content: 'Random prompt';
 }
 .popover#clear:hover::after {
-  content: 'Clear gallery';
+  content: 'Clear';
 }
 .popover#refresh:hover::after {
   content: var(--seed, "-1");
+}
+
+#settings h3 {
+  color: var(--block-title-text-color) !important;
+  margin-top: 8px !important;
 }
 
 .tabs, .tabitem, .tab-nav, .tab-nav > .selected {

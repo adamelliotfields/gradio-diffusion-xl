@@ -1,12 +1,19 @@
 import argparse
-import json
-import random
 
 import gradio as gr
 
-from lib import Config, async_call, disable_progress_bars, download_repo_files, generate, read_file
+from lib import Config, async_call, disable_progress_bars, download_repo_files, generate, read_file, read_json
 
-# the CSS `content` attribute expects a string so we need to wrap the number in quotes
+# Update refresh button hover text
+seed_js = """
+(seed) => {
+    const button = document.getElementById("refresh");
+    button.style.setProperty("--seed", `"${seed}"`);
+    return seed;
+}
+"""
+
+# The CSS `content` attribute expects a string so we need to wrap the number in quotes
 refresh_seed_js = """
 () => {
     const n = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
@@ -16,14 +23,7 @@ refresh_seed_js = """
 }
 """
 
-seed_js = """
-(seed) => {
-    const button = document.getElementById("refresh");
-    button.style.setProperty("--seed", `"${seed}"`);
-    return seed;
-}
-"""
-
+# Update width and height on aspect ratio change
 aspect_ratio_js = """
 (ar, w, h) => {
     if (!ar) return [w, h];
@@ -32,13 +32,29 @@ aspect_ratio_js = """
 }
 """
 
+# Show "Custom" aspect ratio when manually changing width or height, or one of the predefined ones
+custom_aspect_ratio_js = """
+(w, h) => {
+    if (w === 768 && h === 1344) return "768,1344";
+    if (w === 896 && h === 1152) return "896,1152";
+    if (w === 1024 && h === 1024) return "1024,1024"; 
+    if (w === 1152 && h === 896) return "1152,896";
+    if (w === 1344 && h === 768) return "1344,768";
+    return null;
+}
+"""
 
-def random_fn():
-    prompts = read_file("data/prompts.json")
-    prompts = json.loads(prompts)
-    return gr.Textbox(value=random.choice(prompts))
+# Inject prompts into random function
+random_prompt_js = f"""
+(prompt) => {{
+    const prompts = {read_json("data/prompts.json")};
+    const filtered = prompts.filter(p => p !== prompt);
+    return filtered[Math.floor(Math.random() * filtered.length)];
+}}
+"""
 
 
+# Transform the raw inputs before generation
 async def generate_fn(*args, progress=gr.Progress(track_tqdm=True)):
     if len(args) > 0:
         prompt = args[0]
@@ -59,7 +75,7 @@ async def generate_fn(*args, progress=gr.Progress(track_tqdm=True)):
             progress=progress,
         )
     except RuntimeError:
-        raise gr.Error("Please try again later")
+        raise gr.Error("Error: Please try again")
 
     return images
 
@@ -78,8 +94,8 @@ with gr.Blocks(
         radius_size=gr.themes.sizes.radius_sm,
         spacing_size=gr.themes.sizes.spacing_md,
         # fonts
-        font=[gr.themes.GoogleFont("Inter"), *Config.SANS_FONTS],
-        font_mono=[gr.themes.GoogleFont("Ubuntu Mono"), *Config.MONO_FONTS],
+        font=[gr.themes.GoogleFont("Inter"), "sans-serif"],
+        font_mono=[gr.themes.GoogleFont("Ubuntu Mono"), "monospace"],
     ).set(
         layout_gap="8px",
         block_shadow="0 0 #0000",
@@ -93,27 +109,24 @@ with gr.Blocks(
     with gr.Tabs():
         with gr.TabItem("🏠 Home"):
             with gr.Column():
-                with gr.Group():
-                    output_images = gr.Gallery(
-                        elem_classes=["gallery"],
-                        show_share_button=False,
-                        object_fit="cover",
-                        interactive=False,
-                        show_label=False,
-                        label="Output",
-                        format="png",
-                        columns=2,
-                    )
-                    prompt = gr.Textbox(
-                        placeholder="What do you want to see?",
-                        autoscroll=False,
-                        show_label=False,
-                        label="Prompt",
-                        max_lines=3,
-                        lines=3,
-                    )
-
-                # Buttons
+                output_images = gr.Gallery(
+                    elem_classes=["gallery"],
+                    show_share_button=False,
+                    object_fit="cover",
+                    interactive=False,
+                    show_label=False,
+                    label="Output",
+                    format="png",
+                    columns=2,
+                )
+                prompt = gr.Textbox(
+                    placeholder="What do you want to see?",
+                    autoscroll=False,
+                    show_label=False,
+                    label="Prompt",
+                    max_lines=3,
+                    lines=3,
+                )
                 with gr.Row():
                     generate_btn = gr.Button("Generate", variant="primary")
                     random_btn = gr.Button(
@@ -139,145 +152,130 @@ with gr.Blocks(
                         value="🗑️",
                     )
 
-        with gr.TabItem("⚙️ Menu"):
-            with gr.Group():
+        with gr.TabItem("⚙️ Settings", elem_id="settings"):
+            # Prompt settings
+            gr.HTML("<h3>Prompt</h3>")
+            with gr.Row():
                 negative_prompt = gr.Textbox(
-                    value="nsfw+",
+                    value="nsfw",
                     label="Negative Prompt",
-                    lines=2,
+                    lines=1,
                 )
 
-                with gr.Row():
-                    model = gr.Dropdown(
-                        choices=Config.MODELS,
-                        filterable=False,
-                        value=Config.MODEL,
-                        label="Model",
-                        min_width=240,
-                    )
-                    scheduler = gr.Dropdown(
-                        choices=Config.SCHEDULERS.keys(),
-                        value=Config.SCHEDULER,
-                        elem_id="scheduler",
-                        label="Scheduler",
-                        filterable=False,
-                    )
+            # Model settings
+            gr.HTML("<h3>Settings</h3>")
+            with gr.Row():
+                model = gr.Dropdown(
+                    choices=Config.MODELS,
+                    value=Config.MODEL,
+                    filterable=False,
+                    label="Checkpoint",
+                    min_width=240,
+                )
+                scheduler = gr.Dropdown(
+                    choices=Config.SCHEDULERS.keys(),
+                    value=Config.SCHEDULER,
+                    elem_id="scheduler",
+                    label="Scheduler",
+                    filterable=False,
+                )
 
-                with gr.Row():
-                    styles = json.loads(read_file("data/styles.json"))
-                    style_ids = list(styles.keys())
-                    style_ids = [sid for sid in style_ids if not sid.startswith("_")]
-                    style = gr.Dropdown(
-                        value=Config.STYLE,
-                        label="Style",
-                        min_width=240,
-                        choices=[("None", None)] + [(styles[sid]["name"], sid) for sid in style_ids],
-                    )
+            # Generation settings
+            gr.HTML("<h3>Generation</h3>")
+            with gr.Row():
+                guidance_scale = gr.Slider(
+                    value=Config.GUIDANCE_SCALE,
+                    label="Guidance Scale",
+                    minimum=1.0,
+                    maximum=15.0,
+                    step=0.1,
+                )
+                inference_steps = gr.Slider(
+                    value=Config.INFERENCE_STEPS,
+                    label="Inference Steps",
+                    minimum=1,
+                    maximum=50,
+                    step=1,
+                )
+                deepcache_interval = gr.Slider(
+                    value=Config.DEEPCACHE_INTERVAL,
+                    label="DeepCache",
+                    minimum=1,
+                    maximum=4,
+                    step=1,
+                )
+            with gr.Row():
+                width = gr.Slider(
+                    value=Config.WIDTH,
+                    label="Width",
+                    minimum=512,
+                    maximum=1536,
+                    step=64,
+                )
+                height = gr.Slider(
+                    value=Config.HEIGHT,
+                    label="Height",
+                    minimum=512,
+                    maximum=1536,
+                    step=64,
+                )
+                aspect_ratio = gr.Dropdown(
+                    value=f"{Config.WIDTH},{Config.HEIGHT}",
+                    label="Aspect Ratio",
+                    filterable=False,
+                    choices=[
+                        ("Custom", None),
+                        ("4:7 (768x1344)", "768,1344"),
+                        ("7:9 (896x1152)", "896,1152"),
+                        ("1:1 (1024x1024)", "1024,1024"),
+                        ("9:7 (1152x896)", "1152,896"),
+                        ("7:4 (1344x768)", "1344,768"),
+                    ],
+                )
+            with gr.Row():
+                num_images = gr.Dropdown(
+                    choices=list(range(1, 5)),
+                    value=Config.NUM_IMAGES,
+                    filterable=False,
+                    label="Images",
+                )
+                scale = gr.Dropdown(
+                    choices=[(f"{s}x", s) for s in Config.SCALES],
+                    filterable=False,
+                    value=Config.SCALE,
+                    label="Scale",
+                )
+                seed = gr.Number(
+                    value=Config.SEED,
+                    label="Seed",
+                    minimum=-1,
+                    maximum=(2**64) - 1,
+                )
+            with gr.Row():
+                use_karras = gr.Checkbox(
+                    elem_classes=["checkbox"],
+                    label="Karras σ",
+                    value=True,
+                )
+                use_refiner = gr.Checkbox(
+                    elem_classes=["checkbox"],
+                    label="Refiner",
+                    value=False,
+                )
 
-                with gr.Row():
-                    guidance_scale = gr.Slider(
-                        value=Config.GUIDANCE_SCALE,
-                        label="Guidance Scale",
-                        minimum=1.0,
-                        maximum=15.0,
-                        step=0.1,
-                    )
-                    inference_steps = gr.Slider(
-                        value=Config.INFERENCE_STEPS,
-                        label="Inference Steps",
-                        minimum=1,
-                        maximum=50,
-                        step=1,
-                    )
-                    deepcache_interval = gr.Slider(
-                        value=Config.DEEPCACHE_INTERVAL,
-                        label="DeepCache",
-                        minimum=1,
-                        maximum=4,
-                        step=1,
-                    )
+        with gr.TabItem("ℹ️ Info"):
+            gr.Markdown(read_file("DOCS.md"))
 
-                with gr.Row():
-                    width = gr.Slider(
-                        value=Config.WIDTH,
-                        label="Width",
-                        minimum=512,
-                        maximum=1536,
-                        step=64,
-                    )
-                    height = gr.Slider(
-                        value=Config.HEIGHT,
-                        label="Height",
-                        minimum=512,
-                        maximum=1536,
-                        step=64,
-                    )
-                    aspect_ratio = gr.Dropdown(
-                        value=f"{Config.WIDTH},{Config.HEIGHT}",
-                        label="Aspect Ratio",
-                        filterable=False,
-                        choices=[
-                            ("Custom", None),
-                            ("4:7 (768x1344)", "768,1344"),
-                            ("7:9 (896x1152)", "896,1152"),
-                            ("1:1 (1024x1024)", "1024,1024"),
-                            ("9:7 (1152x896)", "1152,896"),
-                            ("7:4 (1344x768)", "1344,768"),
-                        ],
-                    )
+    # Random prompt on click
+    random_btn.click(None, inputs=[prompt], outputs=[prompt], js=random_prompt_js)
 
-                with gr.Row():
-                    file_format = gr.Dropdown(
-                        choices=["png", "jpeg", "webp"],
-                        label="File Format",
-                        filterable=False,
-                        value="png",
-                    )
-                    num_images = gr.Dropdown(
-                        choices=list(range(1, 5)),
-                        value=Config.NUM_IMAGES,
-                        filterable=False,
-                        label="Images",
-                    )
-                    scale = gr.Dropdown(
-                        choices=[(f"{s}x", s) for s in Config.SCALES],
-                        filterable=False,
-                        value=Config.SCALE,
-                        label="Scale",
-                    )
-                    seed = gr.Number(
-                        value=Config.SEED,
-                        label="Seed",
-                        minimum=-1,
-                        maximum=(2**64) - 1,
-                    )
-
-                with gr.Row():
-                    use_karras = gr.Checkbox(
-                        elem_classes=["checkbox"],
-                        label="Karras σ",
-                        value=True,
-                    )
-                    use_refiner = gr.Checkbox(
-                        elem_classes=["checkbox"],
-                        label="Refiner",
-                        value=False,
-                    )
-
-    random_btn.click(random_fn, inputs=[], outputs=[prompt], show_api=False)
-
+    # Update seed on click
     refresh_btn.click(None, inputs=[], outputs=[seed], js=refresh_seed_js)
 
+    # Update seed button hover text
     seed.change(None, inputs=[seed], outputs=[], js=seed_js)
 
-    file_format.change(
-        lambda f: gr.Gallery(format=f),
-        inputs=[file_format],
-        outputs=[output_images],
-        show_api=False,
-    )
-
-    # input events are only user input; change events are both user and programmatic
+    # Update width and height on aspect ratio change
     aspect_ratio.input(
         None,
         inputs=[aspect_ratio, width, height],
@@ -285,15 +283,16 @@ with gr.Blocks(
         js=aspect_ratio_js,
     )
 
-    # show "Custom" aspect ratio when manually changing width or height
+    # Show "Custom" aspect ratio when manually changing width or height
     gr.on(
         triggers=[width.input, height.input],
         fn=None,
-        inputs=[],
+        inputs=[width, height],
         outputs=[aspect_ratio],
-        js="() => { return null; }",
+        js=custom_aspect_ratio_js,
     )
 
+    # Generate images
     gr.on(
         triggers=[generate_btn.click, prompt.submit],
         fn=generate_fn,
@@ -302,7 +301,6 @@ with gr.Blocks(
         inputs=[
             prompt,
             negative_prompt,
-            style,
             seed,
             model,
             scheduler,

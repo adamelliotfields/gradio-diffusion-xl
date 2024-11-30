@@ -1,8 +1,5 @@
-import gc
-import re
 import time
 from datetime import datetime
-from itertools import product
 
 import torch
 from compel import Compel, ReturnedEmbeddingsType
@@ -11,45 +8,11 @@ from spaces import GPU
 
 from .config import Config
 from .loader import Loader
-from .utils import load_json
+from .logger import Logger
+from .utils import clear_cuda_cache, safe_progress, timer
 
 
-def parse_prompt_with_arrays(prompt: str) -> list[str]:
-    arrays = re.findall(r"\[\[(.*?)\]\]", prompt)
-
-    if not arrays:
-        return [prompt]
-
-    tokens = [item.split(",") for item in arrays]  # [("a", "b"), (1, 2)]
-    combinations = list(product(*tokens))  # [("a", 1), ("a", 2), ("b", 1), ("b", 2)]
-
-    # find all the arrays in the prompt and replace them with tokens
-    prompts = []
-    for combo in combinations:
-        current_prompt = prompt
-        for i, token in enumerate(combo):
-            current_prompt = current_prompt.replace(f"[[{arrays[i]}]]", token.strip(), 1)
-        prompts.append(current_prompt)
-    return prompts
-
-
-def apply_style(positive_prompt, negative_prompt, style_id="none"):
-    if style_id.lower() == "none":
-        return (positive_prompt, negative_prompt)
-
-    styles = load_json("./data/styles.json")
-    style = styles.get(style_id)
-    if style is None:
-        return (positive_prompt, negative_prompt)
-
-    style_base = style.get("_base", {})
-    return (
-        style.get("positive").format(prompt=positive_prompt, _base=style_base.get("positive")).strip(),
-        style.get("negative").format(prompt=negative_prompt, _base=style_base.get("negative")).strip(),
-    )
-
-
-# max 60s per image
+# Dynamic signature for the GPU duration function; max 60s per image
 def gpu_duration(**kwargs):
     loading = 15
     duration = 15
@@ -76,13 +39,12 @@ def gpu_duration(**kwargs):
 def generate(
     positive_prompt,
     negative_prompt="",
-    style=None,
     seed=None,
     model="stabilityai/stable-diffusion-xl-base-1.0",
-    scheduler="DDIM",
+    scheduler="Euler",
     width=1024,
     height=1024,
-    guidance_scale=7.5,
+    guidance_scale=6.0,
     inference_steps=40,
     deepcache=1,
     scale=1,
@@ -93,6 +55,13 @@ def generate(
     Info=None,
     progress=None,
 ):
+    start = time.perf_counter()
+    log = Logger("generate")
+    log.info(f"Generating {num_images} image{'s' if num_images > 1 else ''}...")
+
+    if Config.ZERO_GPU:
+        safe_progress(progress, 100, 100, "ZeroGPU init")
+
     if not torch.cuda.is_available():
         raise Error("CUDA not available")
 
@@ -108,7 +77,6 @@ def generate(
     # custom progress bar for multiple images
     def callback_on_step_end(pipeline, step, timestep, latents):
         nonlocal CURRENT_IMAGE, CURRENT_STEP
-
         if progress is not None:
             # calculate total steps for img2img based on denoising strength
             strength = 1
@@ -121,18 +89,11 @@ def generate(
             else:
                 refining = True
                 CURRENT_STEP += 1
-
             progress(
                 (CURRENT_STEP, total_steps),
                 desc=f"{'Refining' if refining else 'Generating'} image {CURRENT_IMAGE}/{num_images}",
             )
         return latents
-
-    start = time.perf_counter()
-    print(f"Generating {num_images} image{'s' if num_images > 1 else ''}")
-
-    if Config.ZERO_GPU and progress is not None:
-        progress((100, 100), desc="ZeroGPU init")
 
     loader = Loader()
     loader.load(
@@ -173,19 +134,13 @@ def generate(
 
     images = []
     current_seed = seed
+    safe_progress(progress, 0, num_images, f"Generating image 0/{num_images}")
+
     for i in range(num_images):
-        generator = torch.Generator(device=pipe.device).manual_seed(current_seed)
-
         try:
-            positive_prompts = parse_prompt_with_arrays(positive_prompt)
-            index = i % len(positive_prompts)
-            positive_styled, negative_styled = apply_style(positive_prompts[index], negative_prompt, style)
-
-            if negative_styled.startswith("(), "):
-                negative_styled = negative_styled[4:]
-
-            conditioning_1, pooled_1 = compel_1([positive_styled, negative_styled])
-            conditioning_2, pooled_2 = compel_2([positive_styled, negative_styled])
+            generator = torch.Generator(device=pipe.device).manual_seed(current_seed)
+            conditioning_1, pooled_1 = compel_1([positive_prompt, negative_prompt])
+            conditioning_2, pooled_2 = compel_2([positive_prompt, negative_prompt])
         except PromptParser.ParsingException:
             raise Error("Invalid prompt")
 
@@ -214,46 +169,52 @@ def generate(
             "negative_pooled_prompt_embeds": pooled_1[1:2],
         }
 
+        refiner_kwargs = {
+            "denoising_start": 0.8,
+            "generator": generator,
+            "output_type": refiner_output_type,
+            "guidance_scale": guidance_scale,
+            "num_inference_steps": inference_steps,
+            "prompt_embeds": conditioning_2[0:1],
+            "pooled_prompt_embeds": pooled_2[0:1],
+            "negative_prompt_embeds": conditioning_2[1:2],
+            "negative_pooled_prompt_embeds": pooled_2[1:2],
+        }
+
         if progress is not None:
             pipe_kwargs["callback_on_step_end"] = callback_on_step_end
+            refiner_kwargs["callback_on_step_end"] = callback_on_step_end
 
         try:
             image = pipe(**pipe_kwargs).images[0]
-
-            refiner_kwargs = {
-                "image": image,
-                "denoising_start": 0.8,
-                "generator": generator,
-                "output_type": refiner_output_type,
-                "guidance_scale": guidance_scale,
-                "num_inference_steps": inference_steps,
-                "prompt_embeds": conditioning_2[0:1],
-                "pooled_prompt_embeds": pooled_2[0:1],
-                "negative_prompt_embeds": conditioning_2[1:2],
-                "negative_pooled_prompt_embeds": pooled_2[1:2],
-            }
-
-            if progress is not None:
-                refiner_kwargs["callback_on_step_end"] = callback_on_step_end
             if use_refiner:
+                refiner_kwargs["image"] = image
                 image = refiner(**refiner_kwargs).images[0]
-            if scale > 1:
-                image = upscaler.predict(image)
             images.append((image, str(current_seed)))
             current_seed += 1
-        except Exception as e:
-            raise Error(f"{e}")
         finally:
             CURRENT_STEP = 0
             CURRENT_IMAGE += 1
 
-    # cleanup
-    loader.collect()
-    gc.collect()
+    # Upscale
+    if scale > 1:
+        msg = f"Upscaling {scale}x"
+        with timer(msg):
+            safe_progress(progress, 0, num_images, desc=msg)
+            for i, image in enumerate(images):
+                images = upscaler.predict(image[0])
+                images[i] = image
+                safe_progress(progress, i + 1, num_images, desc=msg)
+
+    # Flush memory after generating
+    clear_cuda_cache()
 
     end = time.perf_counter()
     msg = f"Generated {len(images)} image{'s' if len(images) > 1 else ''} in {end - start:.2f}s"
-    print(msg)
+    log.info(msg)
+
+    # Alert if notifier provided
     if Info:
         Info(msg)
+
     return images

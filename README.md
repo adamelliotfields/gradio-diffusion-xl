@@ -6,16 +6,15 @@ emoji: 🦣
 colorFrom: gray
 colorTo: red
 sdk: gradio
-sdk_version: 4.41.0
+sdk_version: 4.44.1
 python_version: 3.11.9
 app_file: app.py
 fullWidth: false
-pinned: false
+pinned: true
 header: mini
 license: apache-2.0
 models:
 - ai-forever/Real-ESRGAN
-- cagliostrolab/animagine-xl-3.1
 - cyberdelia/CyberRealsticXL
 - fluently/Fluently-XL-Final
 - madebyollin/sdxl-vae-fp16-fix
@@ -25,7 +24,6 @@ models:
 - stabilityai/stable-diffusion-xl-refiner-1.0
 preload_from_hub:
 - ai-forever/Real-ESRGAN RealESRGAN_x2.pth,RealESRGAN_x4.pth
-- cagliostrolab/animagine-xl-3.1 animagine-xl-3.1.safetensors
 - cyberdelia/CyberRealsticXL CyberRealisticXLPlay_V1.0.safetensors
 - fluently/Fluently-XL-Final FluentlyXL-Final.safetensors
 - madebyollin/sdxl-vae-fp16-fix config.json,diffusion_pytorch_model.safetensors
@@ -46,9 +44,7 @@ preload_from_hub:
 Gradio app for Stable Diffusion XL featuring:
 
 * txt2img pipeline with refiner (img2img with IP-Adapter and ControlNet coming soon)
-* Curated models (LoRAs and TIs coming soon)
-* Compel prompt weighting
-* Dozens of styles and starter prompts
+* Compel prompt weighting and blending
 * Multiple samplers with Karras scheduling
 * DeepCache available
 * Real-ESRGAN upscaling

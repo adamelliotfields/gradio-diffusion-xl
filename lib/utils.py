@@ -1,13 +1,12 @@
 import functools
 import inspect
 import json
-import os
 import time
 from contextlib import contextmanager
 from typing import Callable, TypeVar
 
 import anyio
-import httpx
+import torch
 from anyio import Semaphore
 from diffusers.utils import logging as diffusers_logging
 from huggingface_hub._snapshot_download import snapshot_download
@@ -34,9 +33,10 @@ def timer(message="Operation", logger=print):
 
 
 @functools.lru_cache()
-def load_json(path: str) -> dict:
+def read_json(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as file:
-        return json.load(file)
+        data = json.load(file)
+        return json.dumps(data, indent=4)
 
 
 @functools.lru_cache()
@@ -56,6 +56,19 @@ def enable_progress_bars():
     diffusers_logging.enable_progress_bar()
 
 
+def safe_progress(progress, current=0, total=0, desc=""):
+    if progress is not None:
+        progress((current, total), desc=desc)
+
+
+def clear_cuda_cache():
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+        torch.cuda.reset_peak_memory_stats()
+        torch.cuda.synchronize()
+
+
 def download_repo_files(repo_id, allow_patterns, token=None):
     was_disabled = are_progress_bars_disabled()
     enable_progress_bars()
@@ -72,34 +85,7 @@ def download_repo_files(repo_id, allow_patterns, token=None):
     return snapshot_path
 
 
-def download_civit_file(lora_id, version_id, file_path=".", token=None):
-    base_url = "https://civitai.com/api/download/models"
-    file = f"{file_path}/{lora_id}.{version_id}.safetensors"
-
-    if os.path.exists(file):
-        return
-
-    try:
-        params = {"token": token}
-        response = httpx.get(
-            f"{base_url}/{version_id}",
-            timeout=None,
-            params=params,
-            follow_redirects=True,
-        )
-
-        response.raise_for_status()
-        os.makedirs(file_path, exist_ok=True)
-
-        with open(file, "wb") as f:
-            f.write(response.content)
-    except httpx.HTTPStatusError as e:
-        print(f"HTTPError: {e.response.status_code} {e.response.text}")
-    except httpx.RequestError as e:
-        print(f"RequestError: {e}")
-
-
-# like the original but supports args and kwargs instead of a dict
+# Like the original but supports args and kwargs instead of a dict
 # https://github.com/huggingface/huggingface-inference-toolkit/blob/0.2.0/src/huggingface_inference_toolkit/async_utils.py
 async def async_call(fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
     async with MAX_THREADS_GUARD:
