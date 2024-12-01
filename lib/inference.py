@@ -9,7 +9,7 @@ from spaces import GPU
 from .config import Config
 from .loader import Loader
 from .logger import Logger
-from .utils import clear_cuda_cache, safe_progress, timer
+from .utils import cuda_collect, safe_progress, timer
 
 
 # Dynamic signature for the GPU duration function; max 60s per image
@@ -55,6 +55,11 @@ def generate(
     Info=None,
     progress=None,
 ):
+    KIND = "txt2img"
+    CURRENT_STEP = 0
+    CURRENT_IMAGE = 1
+    EMBEDDINGS_TYPE = ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED
+
     start = time.perf_counter()
     log = Logger("generate")
     log.info(f"Generating {num_images} image{'s' if num_images > 1 else ''}...")
@@ -68,11 +73,6 @@ def generate(
     # https://pytorch.org/docs/stable/generated/torch.manual_seed.html
     if seed is None or seed < 0:
         seed = int(datetime.now().timestamp() * 1e6) % (2**64)
-
-    KIND = "txt2img"
-    CURRENT_STEP = 0
-    CURRENT_IMAGE = 1
-    EMBEDDINGS_TYPE = ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED
 
     # custom progress bar for multiple images
     def callback_on_step_end(pipeline, step, timestep, latents):
@@ -107,29 +107,29 @@ def generate(
         progress,
     )
 
-    if loader.pipe is None:
-        raise Error(f"Error loading {model}")
-
-    pipe = loader.pipe
     refiner = loader.refiner
+    pipeline = loader.pipeline
     upscaler = loader.upscaler
+
+    if pipeline is None:
+        raise Error(f"Error loading {model}")
 
     # prompt embeds for base and refiner
     compel_1 = Compel(
-        text_encoder=[pipe.text_encoder, pipe.text_encoder_2],
-        tokenizer=[pipe.tokenizer, pipe.tokenizer_2],
+        text_encoder=[pipeline.text_encoder, pipeline.text_encoder_2],
+        tokenizer=[pipeline.tokenizer, pipeline.tokenizer_2],
         requires_pooled=[False, True],
         returned_embeddings_type=EMBEDDINGS_TYPE,
-        dtype_for_device_getter=lambda _: pipe.dtype,
-        device=pipe.device,
+        dtype_for_device_getter=lambda _: pipeline.dtype,
+        device=pipeline.device,
     )
     compel_2 = Compel(
-        text_encoder=[pipe.text_encoder_2],
-        tokenizer=[pipe.tokenizer_2],
+        text_encoder=[pipeline.text_encoder_2],
+        tokenizer=[pipeline.tokenizer_2],
         requires_pooled=[True],
         returned_embeddings_type=EMBEDDINGS_TYPE,
-        dtype_for_device_getter=lambda _: pipe.dtype,
-        device=pipe.device,
+        dtype_for_device_getter=lambda _: pipeline.dtype,
+        device=pipeline.device,
     )
 
     images = []
@@ -138,7 +138,7 @@ def generate(
 
     for i in range(num_images):
         try:
-            generator = torch.Generator(device=pipe.device).manual_seed(current_seed)
+            generator = torch.Generator(device=pipeline.device).manual_seed(current_seed)
             conditioning_1, pooled_1 = compel_1([positive_prompt, negative_prompt])
             conditioning_2, pooled_2 = compel_2([positive_prompt, negative_prompt])
         except PromptParser.ParsingException:
@@ -186,7 +186,7 @@ def generate(
             refiner_kwargs["callback_on_step_end"] = callback_on_step_end
 
         try:
-            image = pipe(**pipe_kwargs).images[0]
+            image = pipeline(**pipe_kwargs).images[0]
             if use_refiner:
                 refiner_kwargs["image"] = image
                 image = refiner(**refiner_kwargs).images[0]
@@ -207,7 +207,7 @@ def generate(
                 safe_progress(progress, i + 1, num_images, desc=msg)
 
     # Flush memory after generating
-    clear_cuda_cache()
+    cuda_collect()
 
     end = time.perf_counter()
     msg = f"Generated {len(images)} image{'s' if len(images) > 1 else ''} in {end - start:.2f}s"

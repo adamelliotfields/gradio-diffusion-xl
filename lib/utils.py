@@ -1,24 +1,13 @@
 import functools
-import inspect
 import json
 import time
 from contextlib import contextmanager
-from typing import Callable, TypeVar
 
-import anyio
 import torch
-from anyio import Semaphore
 from diffusers.utils import logging as diffusers_logging
 from huggingface_hub._snapshot_download import snapshot_download
 from huggingface_hub.utils import are_progress_bars_disabled
 from transformers import logging as transformers_logging
-from typing_extensions import ParamSpec
-
-T = TypeVar("T")
-P = ParamSpec("P")
-
-MAX_CONCURRENT_THREADS = 1
-MAX_THREADS_GUARD = Semaphore(MAX_CONCURRENT_THREADS)
 
 
 @contextmanager
@@ -61,7 +50,7 @@ def safe_progress(progress, current=0, total=0, desc=""):
         progress((current, total), desc=desc)
 
 
-def clear_cuda_cache():
+def cuda_collect():
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
         torch.cuda.ipc_collect()
@@ -83,14 +72,3 @@ def download_repo_files(repo_id, allow_patterns, token=None):
     if was_disabled:
         disable_progress_bars()
     return snapshot_path
-
-
-# Like the original but supports args and kwargs instead of a dict
-# https://github.com/huggingface/huggingface-inference-toolkit/blob/0.2.0/src/huggingface_inference_toolkit/async_utils.py
-async def async_call(fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
-    async with MAX_THREADS_GUARD:
-        sig = inspect.signature(fn)
-        bound_args = sig.bind(*args, **kwargs)
-        bound_args.apply_defaults()
-        partial_fn = functools.partial(fn, **bound_args.arguments)
-        return await anyio.to_thread.run_sync(partial_fn)

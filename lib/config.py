@@ -56,15 +56,12 @@ _sdxl_files = [
     "tokenizer/vocab.json",
 ]
 
+_sdxl_files_with_vae = [*_sdxl_files, "vae_1_0/config.json"]
+
 # Using namespace instead of dataclass for simplicity
 Config = SimpleNamespace(
     HF_TOKEN=os.environ.get("HF_TOKEN", None),
     ZERO_GPU=import_module("spaces").config.Config.zero_gpu,
-    HF_MODELS={
-        "segmind/Segmind-Vega": [*_sdxl_files],
-        "stabilityai/stable-diffusion-xl-base-1.0": [*_sdxl_files, "vae_1_0/config.json"],
-        "stabilityai/stable-diffusion-xl-refiner-1.0": [*_sdxl_refiner_files],
-    },
     PIPELINES={
         "txt2img": StableDiffusionXLPipeline,
         "img2img": StableDiffusionXLImg2ImgPipeline,
@@ -77,13 +74,21 @@ Config = SimpleNamespace(
         "SG161222/RealVisXL_V5.0",
         "stabilityai/stable-diffusion-xl-base-1.0",
     ],
-    # Single-file model weights
-    MODEL_CHECKPOINTS={
-        # keep keys lowercase for case-insensitive matching in the loader
-        "cyberdelia/cyberrealsticxl": "CyberRealisticXLPlay_V1.0.safetensors",  # typo in "realistic"
-        "fluently/fluently-xl-final": "FluentlyXL-Final.safetensors",
-        "sg161222/realvisxl_v5.0": "RealVisXL_V5.0_fp16.safetensors",
+    HF_REPOS={
+        "ai-forever/Real-ESRGAN": ["RealESRGAN_x2.pth", "RealESRGAN_x4.pth"],
+        "cyberdelia/CyberRealsticXL": ["CyberRealisticXLPlay_V1.0.safetensors"],
+        "fluently/Fluently-XL-Final": ["FluentlyXL-Final.safetensors"],
+        "madebyollin/sdxl-vae-fp16-fix": ["config.json", "diffusion_pytorch_model.fp16.safetensors"],
+        "segmind/Segmind-Vega": _sdxl_files,
+        "SG161222/RealVisXL_V5.0": ["RealVisXL_V5.0_fp16.safetensors"],
+        "stabilityai/stable-diffusion-xl-base-1.0": _sdxl_files_with_vae,
+        "stabilityai/stable-diffusion-xl-refiner-1.0": _sdxl_refiner_files,
     },
+    SINGLE_FILE_MODELS=[
+        "cyberdelia/cyberrealsticxl",
+        "fluently/fluently-xl-final",
+        "sg161222/realvisxl_v5.0",
+    ],
     VAE_MODEL="madebyollin/sdxl-vae-fp16-fix",
     REFINER_MODEL="stabilityai/stable-diffusion-xl-refiner-1.0",
     SCHEDULER="Euler",

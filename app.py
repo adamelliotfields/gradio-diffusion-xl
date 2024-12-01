@@ -2,7 +2,14 @@ import argparse
 
 import gradio as gr
 
-from lib import Config, async_call, disable_progress_bars, download_repo_files, generate, read_file, read_json
+from lib import (
+    Config,
+    # disable_progress_bars,
+    download_repo_files,
+    generate,
+    read_file,
+    read_json,
+)
 
 # Update refresh button hover text
 seed_js = """
@@ -55,28 +62,19 @@ random_prompt_js = f"""
 
 
 # Transform the raw inputs before generation
-async def generate_fn(*args, progress=gr.Progress(track_tqdm=True)):
+def generate_fn(*args, progress=gr.Progress(track_tqdm=True)):
     if len(args) > 0:
         prompt = args[0]
     else:
         prompt = None
     if prompt is None or prompt.strip() == "":
         raise gr.Error("You must enter a prompt")
-
     try:
-        if Config.ZERO_GPU:
-            progress((0, 100), desc="ZeroGPU init")
-
-        images = await async_call(
-            generate,
-            *args,
-            Error=gr.Error,
-            Info=gr.Info,
-            progress=progress,
-        )
+        # if Config.ZERO_GPU:
+        #     progress((0, 100), desc="ZeroGPU init")
+        images = generate(*args, Error=gr.Error, Info=gr.Info, progress=progress)
     except RuntimeError:
         raise gr.Error("Error: Please try again")
-
     return images
 
 
@@ -259,7 +257,7 @@ with gr.Blocks(
                 )
                 use_refiner = gr.Checkbox(
                     elem_classes=["checkbox"],
-                    label="Refiner",
+                    label="Use refiner",
                     value=False,
                 )
 
@@ -322,8 +320,8 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--port", type=int, metavar="INT", default=7860)
     args = parser.parse_args()
 
-    disable_progress_bars()
-    for repo_id, allow_patterns in Config.HF_MODELS.items():
+    # disable_progress_bars()
+    for repo_id, allow_patterns in Config.HF_REPOS.items():
         download_repo_files(repo_id, allow_patterns, token=Config.HF_TOKEN)
 
     # https://www.gradio.app/docs/gradio/interface#interface-queue
