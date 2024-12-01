@@ -1,11 +1,20 @@
 import argparse
+import os
+from importlib.util import find_spec
+
+# Improved GPU handling and progress bars
+os.environ["ZEROGPU_V2"] = "1"
+
+# Use Rust-based downloader
+if find_spec("hf_transfer"):
+    os.environ["HF_HUB_ENABLE_HF_TRANSFER"] = "1"
 
 import gradio as gr
+from huggingface_hub._snapshot_download import snapshot_download
 
 from lib import (
     Config,
-    # disable_progress_bars,
-    download_repo_files,
+    disable_progress_bars,
     generate,
     read_file,
     read_json,
@@ -59,24 +68,6 @@ random_prompt_js = f"""
     return filtered[Math.floor(Math.random() * filtered.length)];
 }}
 """
-
-
-# Transform the raw inputs before generation
-def generate_fn(*args, progress=gr.Progress(track_tqdm=True)):
-    if len(args) > 0:
-        prompt = args[0]
-    else:
-        prompt = None
-    if prompt is None or prompt.strip() == "":
-        raise gr.Error("You must enter a prompt")
-    try:
-        # if Config.ZERO_GPU:
-        #     progress((0, 100), desc="ZeroGPU init")
-        images = generate(*args, Error=gr.Error, Info=gr.Info, progress=progress)
-    except RuntimeError:
-        raise gr.Error("Error: Please try again")
-    return images
-
 
 with gr.Blocks(
     head=read_file("./partials/head.html"),
@@ -244,10 +235,10 @@ with gr.Blocks(
                     label="Scale",
                 )
                 seed = gr.Number(
-                    value=Config.SEED,
-                    label="Seed",
                     minimum=-1,
                     maximum=(2**64) - 1,
+                    label="Seed",
+                    value=-1,
                 )
             with gr.Row():
                 use_karras = gr.Checkbox(
@@ -293,7 +284,7 @@ with gr.Blocks(
     # Generate images
     gr.on(
         triggers=[generate_btn.click, prompt.submit],
-        fn=generate_fn,
+        fn=generate,
         api_name="generate",
         outputs=[output_images],
         inputs=[
@@ -321,8 +312,16 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # disable_progress_bars()
+    token = os.environ.get("HF_TOKEN", None)
     for repo_id, allow_patterns in Config.HF_REPOS.items():
-        download_repo_files(repo_id, allow_patterns, token=Config.HF_TOKEN)
+        snapshot_download(
+            repo_id=repo_id,
+            repo_type="model",
+            revision="main",
+            token=token,
+            allow_patterns=allow_patterns,
+            ignore_patterns=None,
+        )
 
     # https://www.gradio.app/docs/gradio/interface#interface-queue
     demo.queue(default_concurrency_limit=1).launch(

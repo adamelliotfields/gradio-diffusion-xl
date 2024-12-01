@@ -5,8 +5,6 @@ from contextlib import contextmanager
 
 import torch
 from diffusers.utils import logging as diffusers_logging
-from huggingface_hub._snapshot_download import snapshot_download
-from huggingface_hub.utils import are_progress_bars_disabled
 from transformers import logging as transformers_logging
 
 
@@ -45,9 +43,14 @@ def enable_progress_bars():
     diffusers_logging.enable_progress_bar()
 
 
-def safe_progress(progress, current=0, total=0, desc=""):
-    if progress is not None:
-        progress((current, total), desc=desc)
+def get_output_types(scale=1, use_refiner=False):
+    if use_refiner:
+        pipeline_type = "latent"
+        refiner_type = "np" if scale > 1 else "pil"
+    else:
+        refiner_type = "pil"
+        pipeline_type = "np" if scale > 1 else "pil"
+    return (pipeline_type, refiner_type)
 
 
 def cuda_collect():
@@ -56,19 +59,3 @@ def cuda_collect():
         torch.cuda.ipc_collect()
         torch.cuda.reset_peak_memory_stats()
         torch.cuda.synchronize()
-
-
-def download_repo_files(repo_id, allow_patterns, token=None):
-    was_disabled = are_progress_bars_disabled()
-    enable_progress_bars()
-    snapshot_path = snapshot_download(
-        repo_id=repo_id,
-        repo_type="model",
-        revision="main",
-        token=token,
-        allow_patterns=allow_patterns,
-        ignore_patterns=None,
-    )
-    if was_disabled:
-        disable_progress_bars()
-    return snapshot_path
