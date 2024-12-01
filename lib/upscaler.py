@@ -272,7 +272,7 @@ class RealESRGAN:
         assert self.scale in [2, 4], "You can download models only with scales: 2, 4"
         config = HF_MODELS[self.scale]
         cache_path = hf_hub_download(config["repo_id"], filename=config["filename"])
-        loadnet = torch.load(cache_path)
+        loadnet = torch.load(cache_path, weights_only=True)
         if "params" in loadnet:
             self.model.load_state_dict(loadnet["params"], strict=True)
         elif "params_ema" in loadnet:
