@@ -152,7 +152,7 @@ with gr.Blocks(
                 )
 
             # Model settings
-            gr.HTML("<h3>Settings</h3>")
+            gr.HTML("<h3>Model</h3>")
             with gr.Row():
                 model = gr.Dropdown(
                     choices=Config.MODELS,

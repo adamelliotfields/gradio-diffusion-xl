@@ -9,6 +9,7 @@ from diffusers import (
     EulerDiscreteScheduler,
     StableDiffusionXLImg2ImgPipeline,
     StableDiffusionXLPipeline,
+    UniPCMultistepScheduler,
 )
 from diffusers.utils import logging as diffusers_logging
 from transformers import logging as transformers_logging
@@ -79,13 +80,13 @@ Config = SimpleNamespace(
     ],
     VAE_MODEL="madebyollin/sdxl-vae-fp16-fix",
     REFINER_MODEL="stabilityai/stable-diffusion-xl-refiner-1.0",
-    SCHEDULER="Euler",
+    SCHEDULER="UniPC",
     SCHEDULERS={
-        "DDIM": DDIMScheduler,
-        "DEIS 2M": DEISMultistepScheduler,
+        "DEIS": DEISMultistepScheduler,
         "DPM++ 2M": DPMSolverMultistepScheduler,
         "Euler": EulerDiscreteScheduler,
         "Euler a": EulerAncestralDiscreteScheduler,
+        "UniPC": UniPCMultistepScheduler,
     },
     WIDTH=1024,
     HEIGHT=1024,

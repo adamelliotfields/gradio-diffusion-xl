@@ -126,6 +126,9 @@ class Loader:
                 self.refiner.deepcache.enable()
 
     def load(self, kind, model, scheduler, deepcache_interval, scale, use_karras, use_refiner, progress=None):
+        Pipeline = Config.PIPELINES[kind]
+        Scheduler = Config.SCHEDULERS[scheduler]
+
         scheduler_kwargs = {
             "beta_start": 0.00085,
             "beta_end": 0.012,
@@ -134,32 +137,25 @@ class Loader:
             "steps_offset": 1,
         }
 
-        if scheduler not in ["DDIM", "Euler a"]:
-            scheduler_kwargs["use_karras_sigmas"] = use_karras
-
-        if scheduler == "DDIM":
-            scheduler_kwargs["clip_sample"] = False
-            scheduler_kwargs["set_alpha_to_one"] = False
-
-        if model not in Config.SINGLE_FILE_MODELS:
-            variant = "fp16"
-        else:
-            variant = None
-
-        dtype = torch.float16
         pipeline_kwargs = {
-            "variant": variant,
-            "torch_dtype": dtype,
+            "torch_dtype": torch.float16,
             "add_watermarker": False,
             "scheduler": Config.SCHEDULERS[scheduler](**scheduler_kwargs),
-            "vae": AutoencoderKL.from_pretrained(Config.VAE_MODEL, torch_dtype=dtype),
+            "vae": AutoencoderKL.from_pretrained(Config.VAE_MODEL, torch_dtype=torch.float16),
         }
 
+        if scheduler not in ["Euler a"]:
+            scheduler_kwargs["use_karras_sigmas"] = use_karras
+
+        if model not in Config.SINGLE_FILE_MODELS:
+            pipeline_kwargs["variant"] = "fp16"
+        else:
+            pipeline_kwargs["variant"] = None
+
+        # Unload
         self.unload(model, use_refiner, deepcache_interval, scale)
 
-        Pipeline = Config.PIPELINES[kind]
-        Scheduler = Config.SCHEDULERS[scheduler]
-
+        # Load
         try:
             with timer(f"Loading {model}", logger=self.log.info):
                 self.model = model
