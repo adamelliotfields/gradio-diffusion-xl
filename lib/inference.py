@@ -7,7 +7,7 @@ from compel.prompt_parser import PromptParser
 from gradio import Error, Info, Progress
 from spaces import GPU
 
-from .loader import Loader
+from .loader import get_loader
 from .logger import Logger
 from .utils import cuda_collect, get_output_types, timer
 
@@ -28,7 +28,7 @@ def generate(
     num_images=1,
     use_karras=False,
     use_refiner=False,
-    progress=Progress(track_tqdm=True),
+    _=Progress(track_tqdm=True),
 ):
     if not torch.cuda.is_available():
         raise Error("CUDA not available")
@@ -43,7 +43,7 @@ def generate(
     log = Logger("generate")
     log.info(f"Generating {num_images} image{'s' if num_images > 1 else ''}...")
 
-    loader = Loader()
+    loader = get_loader()
     loader.load(
         KIND,
         model,
@@ -52,7 +52,6 @@ def generate(
         scale,
         use_karras,
         use_refiner,
-        progress,
     )
 
     refiner = loader.refiner
@@ -143,14 +142,14 @@ def generate(
                 seed = images[i][1]
                 images[i] = (image, seed)
 
-    # Flush cache after generating
-    cuda_collect()
-
     end = time.perf_counter()
     msg = f"Generated {len(images)} image{'s' if len(images) > 1 else ''} in {end - start:.2f}s"
     log.info(msg)
 
     if Info:
         Info(msg)
+
+    # Flush cache before returning
+    cuda_collect()
 
     return images
