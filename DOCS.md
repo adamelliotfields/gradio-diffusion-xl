@@ -4,21 +4,21 @@ TL;DR: Enter a prompt or roll the `🎲` and press `Generate`.
 
 ### Prompting
 
-Positive and negative prompts are embedded by [Compel](https://github.com/damian0815/compel) for weighting. See [syntax features](https://github.com/damian0815/compel/blob/main/doc/syntax.md) to learn more.
+Positive and negative prompts are embedded by [Compel](https://github.com/damian0815/compel). See [syntax features](https://github.com/damian0815/compel/blob/main/doc/syntax.md) to learn more.
+
+#### Weighting
 
 Use `+` or `-` to increase the weight of a token. The weight grows exponentially when chained. For example, `blue+` means 1.1x more attention is given to `blue`, while `blue++` means 1.1^2 more, and so on. The same applies to `-`.
 
-For groups of tokens, wrap them in parentheses and multiply by a float between 0 and 2. For example, `a (birthday cake)1.3 on a table` will increase the weight of both `birthday` and `cake` by 1.3x. This also means the entire scene will be more birthday-like, not just the cake. To counteract this, you can use `-` inside the parentheses on specific tokens, e.g., `a (birthday-- cake)1.3`, to reduce the birthday aspect.
+Groups of tokens can be weighted together by wrapping in parentheses and multiplying by a float between 0 and 2. For example, `(masterpiece, best quality)1.2` will increase the weight of both `masterpiece` and `best quality` by 1.2x.
 
 ### Models
 
-Each model checkpoint has a different aesthetic:
-
-* [cyberdelia/CyberRealisticXL](https://huggingface.co/cyberdelia/CyberRealsticXL): photorealistic
-* [fluently/Fluently-XL-Final](https://huggingface.co/fluently/Fluently-XL-Final): general purpose
-* [segmind/Segmind-Vega](https://huggingface.co/segmind/Segmind-Vega): lightweight general purpose (default)
-* [SG161222/RealVisXL_V5.0](https://huggingface.co/SG161222/RealVisXL_V5.0): photorealistic
-* [stabilityai/stable-diffusion-xl-base-1.0](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0): base
+* [cyberdelia/CyberRealisticXL](https://huggingface.co/cyberdelia/CyberRealsticXL)
+* [fluently/Fluently-XL-Final](https://huggingface.co/fluently/Fluently-XL-Final)
+* [segmind/Segmind-Vega](https://huggingface.co/segmind/Segmind-Vega) (default)
+* [SG161222/RealVisXL_V5.0](https://huggingface.co/SG161222/RealVisXL_V5.0)
+* [stabilityai/stable-diffusion-xl-base-1.0](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)
 
 ### Scale
 

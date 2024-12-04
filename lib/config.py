@@ -2,7 +2,6 @@ from types import SimpleNamespace
 from warnings import filterwarnings
 
 from diffusers import (
-    DDIMScheduler,
     DEISMultistepScheduler,
     DPMSolverMultistepScheduler,
     EulerAncestralDiscreteScheduler,

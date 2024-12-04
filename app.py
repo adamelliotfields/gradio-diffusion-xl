@@ -14,7 +14,6 @@ from huggingface_hub._snapshot_download import snapshot_download
 
 from lib import (
     Config,
-    disable_progress_bars,
     generate,
     read_file,
     read_json,
@@ -311,7 +310,6 @@ if __name__ == "__main__":
     parser.add_argument("-p", "--port", type=int, metavar="INT", default=7860)
     args = parser.parse_args()
 
-    # disable_progress_bars()
     token = os.environ.get("HF_TOKEN", None)
     for repo_id, allow_patterns in Config.HF_REPOS.items():
         snapshot_download(
