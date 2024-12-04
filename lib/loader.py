@@ -129,7 +129,7 @@ class Loader:
         if self.vae is None:
             self.vae = AutoencoderKL.from_pretrained(
                 Config.VAE_MODEL,
-                torch_dtype=torch.float32,  # vae is full-precision
+                torch_dtype=torch.float16,
             ).to(self.device)
 
         kwargs["vae"] = self.vae
