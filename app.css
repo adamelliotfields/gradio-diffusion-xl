@@ -34,20 +34,20 @@
   max-width: 42px;
 }
 
-#intro {
+#header {
   margin-bottom: 8px !important;
 }
-#intro > div {
+#header > div {
   display: flex;
 }
-#intro > div > h1 > span {
+#header > div > h1 > span {
   font-style: italic;
   color: #047857 !important;
 }
-#intro > div > h1 > span:is(.dark *) {
+#header > div > h1 > span:is(.dark *) {
   color: #10b981 !important;
 }
-#intro > div > svg {
+#header > div > svg {
   width: 1.5rem;
   height: 1.5rem;
   margin-top: 0.25rem;
@@ -56,7 +56,7 @@
   fill: #047857 !important;
   animation: spin 3s linear infinite reverse;
 }
-#intro > div > svg:is(.dark *) {
+#header > div > svg:is(.dark *) {
   fill: #10b981 !important;
 }
 
