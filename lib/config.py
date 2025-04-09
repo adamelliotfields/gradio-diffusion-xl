@@ -55,7 +55,7 @@ Config = SimpleNamespace(
         "img2img": StableDiffusionXLImg2ImgPipeline,
     },
     HF_REPOS={
-        "ai-forever/Real-ESRGAN": ["RealESRGAN_x2.pth", "RealESRGAN_x4.pth"],
+        "ai-forever/Real-ESRGAN": ["RealESRGAN_x2.pth", "RealESRGAN_x4.pth", "RealESRGAN_x8.pth"],
         "cyberdelia/CyberRealsticXL": ["CyberRealisticXLPlay_V1.0.safetensors"],
         "fluently/Fluently-XL-Final": ["FluentlyXL-Final.safetensors"],
         "madebyollin/sdxl-vae-fp16-fix": ["config.json", "diffusion_pytorch_model.fp16.safetensors"],
