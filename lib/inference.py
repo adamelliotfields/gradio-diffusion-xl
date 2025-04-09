@@ -5,14 +5,12 @@ import torch
 from compel import Compel, ReturnedEmbeddingsType
 from compel.prompt_parser import PromptParser
 from gradio import Error, Info, Progress
-from spaces import GPU
 
 from .loader import get_loader
 from .logger import Logger
 from .utils import cuda_collect, get_output_types, timer
 
 
-@GPU
 def generate(
     positive_prompt="",
     negative_prompt="",
