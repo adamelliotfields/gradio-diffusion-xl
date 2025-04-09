@@ -26,12 +26,6 @@ def read_json(path: str) -> dict:
         return json.dumps(data, indent=4)
 
 
-@functools.lru_cache()
-def read_file(path: str) -> str:
-    with open(path, "r", encoding="utf-8") as file:
-        return file.read()
-
-
 def disable_progress_bars():
     transformers_logging.disable_progress_bar()
     diffusers_logging.disable_progress_bar()

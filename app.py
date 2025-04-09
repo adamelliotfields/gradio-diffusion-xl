@@ -9,12 +9,7 @@ if find_spec("hf_transfer"):
 import gradio as gr
 
 # from huggingface_hub._snapshot_download import snapshot_download
-from lib import (
-    Config,
-    generate,
-    read_file,
-    read_json,
-)
+from lib import Config, generate, read_json
 
 # Update refresh button hover text
 seed_js = """
@@ -274,9 +269,6 @@ with gr.Blocks(
                     label="Use refiner",
                     value=False,
                 )
-
-        with gr.TabItem("ℹ️ Info"):
-            gr.Markdown(read_file("DOCS.md"))
 
     # Random prompt on click
     random_btn.click(None, inputs=[prompt], outputs=[prompt], js=random_prompt_js)

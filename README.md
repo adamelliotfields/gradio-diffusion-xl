@@ -1,84 +1,51 @@
----
-# https://huggingface.co/docs/hub/en/spaces-config-reference
-title: Diffusion XL
-short_description: Stable Diffusion XL image generation studio
-emoji: 🦣
-colorFrom: gray
-colorTo: red
-sdk: gradio
-sdk_version: 4.44.1
-python_version: 3.11.9
-app_file: app.py
-fullWidth: false
-pinned: true
-header: mini
-license: apache-2.0
-models:
-- ai-forever/Real-ESRGAN
-- cyberdelia/CyberRealsticXL
-- fluently/Fluently-XL-Final
-- madebyollin/sdxl-vae-fp16-fix
-- segmind/Segmind-Vega
-- SG161222/RealVisXL_V5.0
-- stabilityai/stable-diffusion-xl-base-1.0
-- stabilityai/stable-diffusion-xl-refiner-1.0
-preload_from_hub:
-- ai-forever/Real-ESRGAN RealESRGAN_x2.pth,RealESRGAN_x4.pth
-- cyberdelia/CyberRealsticXL CyberRealisticXLPlay_V1.0.safetensors
-- fluently/Fluently-XL-Final FluentlyXL-Final.safetensors
-- madebyollin/sdxl-vae-fp16-fix config.json,diffusion_pytorch_model.safetensors
-- SG161222/RealVisXL_V5.0 RealVisXL_V5.0_fp16.safetensors
-- >-
-  segmind/Segmind-Vega
-  scheduler/scheduler_config.json,text_encoder/config.json,text_encoder/model.fp16.safetensors,text_encoder_2/config.json,text_encoder_2/model.fp16.safetensors,tokenizer/merges.txt,tokenizer/special_tokens_map.json,tokenizer/tokenizer_config.json,tokenizer/vocab.json,tokenizer_2/merges.txt,tokenizer_2/special_tokens_map.json,tokenizer_2/tokenizer_config.json,tokenizer_2/vocab.json,unet/config.json,unet/diffusion_pytorch_model.fp16.safetensors,vae/config.json,vae/diffusion_pytorch_model.fp16.safetensors,model_index.json
-- >-
-  stabilityai/stable-diffusion-xl-base-1.0
-  scheduler/scheduler_config.json,text_encoder/config.json,text_encoder/model.fp16.safetensors,text_encoder_2/config.json,text_encoder_2/model.fp16.safetensors,tokenizer/merges.txt,tokenizer/special_tokens_map.json,tokenizer/tokenizer_config.json,tokenizer/vocab.json,tokenizer_2/merges.txt,tokenizer_2/special_tokens_map.json,tokenizer_2/tokenizer_config.json,tokenizer_2/vocab.json,unet/config.json,unet/diffusion_pytorch_model.fp16.safetensors,vae/config.json,vae/diffusion_pytorch_model.fp16.safetensors,vae_1_0/config.json,model_index.json
-- >-
-  stabilityai/stable-diffusion-xl-refiner-1.0
-  scheduler/scheduler_config.json,text_encoder_2/config.json,text_encoder_2/model.fp16.safetensors,tokenizer_2/merges.txt,tokenizer_2/special_tokens_map.json,tokenizer_2/tokenizer_config.json,tokenizer_2/vocab.json,unet/config.json,unet/diffusion_pytorch_model.fp16.safetensors,vae/config.json,vae/diffusion_pytorch_model.fp16.safetensors,model_index.json
----
-
-# diffusion-xl
+# gradio-diffusion-xl
 
 Gradio app for Stable Diffusion XL featuring:
 
-* txt2img pipeline with refiner (img2img with IP-Adapter and ControlNet coming soon)
-* Compel prompt weighting and blending
+* txt2img pipeline with refiner
+* Real-ESRGAN resizing up to 8x
+* Compel prompt weighting support
 * Multiple samplers with Karras scheduling
-* DeepCache available
-* Real-ESRGAN upscaling
-
-## Usage
-
-See [DOCS.md](https://huggingface.co/spaces/adamelliotfields/diffusion-xl/blob/main/DOCS.md).
+* DeepCache available for faster inference
 
 ## Installation
 
 ```sh
-# clone
-git clone https://huggingface.co/spaces/adamelliotfields/diffusion-xl.git
-cd diffusion-xl
-git remote set-url origin https://adamelliotfields:$HF_TOKEN@huggingface.co/spaces/adamelliotfields/diffusion-xl
-
-# install
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# gradio
-python app.py --port 7860
+uv venv
+uv pip install -r requirements.txt
+uv run app.py
 ```
 
-## Development
+## Usage
 
-See [pull requests and discussions](https://huggingface.co/docs/hub/en/repositories-pull-requests-discussions).
+Enter a prompt or roll the `🎲` and press `Generate`.
 
-```sh
-git fetch origin refs/pr/42:pr/42
-git checkout pr/42
-# ...
-git add .
-git commit -m "Commit message"
-git push origin pr/42:refs/pr/42
-```
+### Prompting
+
+Positive and negative prompts are embedded by [Compel](https://github.com/damian0815/compel). See [syntax features](https://github.com/damian0815/compel/blob/main/doc/syntax.md) to learn more.
+
+### Models
+
+* [cyberdelia/CyberRealisticXL](https://huggingface.co/cyberdelia/CyberRealsticXL)
+* [fluently/Fluently-XL-Final](https://huggingface.co/fluently/Fluently-XL-Final)
+* [segmind/Segmind-Vega](https://huggingface.co/segmind/Segmind-Vega) (default)
+* [SG161222/RealVisXL_V5.0](https://huggingface.co/SG161222/RealVisXL_V5.0)
+* [stabilityai/stable-diffusion-xl-base-1.0](https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0)
+
+### Upscaler
+
+Resize up to 8x using [Real-ESRGAN](https://github.com/xinntao/Real-ESRGAN) with weights from [ai-forever](ai-forever/Real-ESRGAN).
+
+### Advanced
+
+#### DeepCache
+
+[DeepCache](https://github.com/horseee/DeepCache) caches lower UNet layers and reuses them every _n_ steps. Trade quality for speed:
+- *1*: no caching (default)
+- *2*: more quality
+- *3*: balanced
+- *4*: more speed
+
+#### Refiner
+
+Use the [ensemble of expert denoisers](https://research.nvidia.com/labs/dir/eDiff-I/) technique, where the first 80% of timesteps are denoised by the base model and the remaining 20% by the [refiner](https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0).
