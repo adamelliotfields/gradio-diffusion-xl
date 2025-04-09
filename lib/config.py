@@ -94,5 +94,5 @@ Config = SimpleNamespace(
     INFERENCE_STEPS=40,
     DEEPCACHE_INTERVAL=1,
     SCALE=1,
-    SCALES=[1, 2, 4],
+    SCALES=[1, 2, 4, 8],
 )

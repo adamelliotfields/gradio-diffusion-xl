@@ -47,10 +47,10 @@ HF_MODELS = {
         "repo_id": "ai-forever/Real-ESRGAN",
         "filename": "RealESRGAN_x4.pth",
     },
-    # 8: {
-    #     "repo_id": "ai-forever/Real-ESRGAN",
-    #     "filename": "RealESRGAN_x8.pth",
-    # },
+    8: {
+        "repo_id": "ai-forever/Real-ESRGAN",
+        "filename": "RealESRGAN_x8.pth",
+    },
 }
 
 
@@ -268,8 +268,8 @@ class RealESRGAN:
         self.device = device
         self.model.to(device=device)
 
-    def load_weights(self):
-        assert self.scale in [2, 4], "You can download models only with scales: 2, 4"
+    def load(self):
+        assert self.scale in [2, 4, 8], "You can download models only with scales: 2, 4, 8"
         config = HF_MODELS[self.scale]
         cache_path = hf_hub_download(config["repo_id"], filename=config["filename"])
         loadnet = torch.load(cache_path, weights_only=True)
@@ -281,7 +281,7 @@ class RealESRGAN:
             self.model.load_state_dict(loadnet, strict=True)
         self.model.eval().to(device=self.device)
 
-    @torch.autocast("cuda")
+    @torch.autocast("cuda" if torch.cuda.is_available() else "cpu")
     def predict(self, lr_image, batch_size=4, patches_size=192, padding=24, pad_size=15):
         if not isinstance(lr_image, np.ndarray):
             lr_image = np.array(lr_image)

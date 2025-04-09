@@ -102,7 +102,7 @@ class Loader:
     def load_upscaler(self, scale=1):
         with timer(f"Loading {scale}x upscaler", logger=self.log.info):
             self.upscaler = RealESRGAN(scale, device=self.device)
-            self.upscaler.load_weights()
+            self.upscaler.load()
 
     def load_refiner(self):
         model = Config.REFINER_MODEL
@@ -208,11 +208,8 @@ class Loader:
 
 
 # Get a singleton or a new instance of the Loader
-def get_loader(singleton=False):
-    if not singleton:
-        return Loader()
-    else:
-        if not hasattr(get_loader, "_instance"):
-            get_loader._instance = Loader()
-        assert isinstance(get_loader._instance, Loader)
-        return get_loader._instance
+def get_loader():
+    if not hasattr(get_loader, "_instance"):
+        get_loader._instance = Loader()
+    assert isinstance(get_loader._instance, Loader)
+    return get_loader._instance
